@@ -124,11 +124,11 @@ jobs:
         run: bash ci/stage.sh
 
       - name: Pack checkpoint
-        if: steps.build.outputs.finished != 'true'
+        if: always()
         run: bash ci/checkpoint.sh
 
       - name: Upload checkpoint part 0
-        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part0') != ''
+        if: hashFiles('cpout/part0') != ''
         uses: actions/upload-artifact@v4
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-0
@@ -136,7 +136,7 @@ jobs:
           compression-level: 0
           retention-days: 3
       - name: Upload checkpoint part 1
-        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part1') != ''
+        if: hashFiles('cpout/part1') != ''
         uses: actions/upload-artifact@v4
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-1
@@ -144,7 +144,7 @@ jobs:
           compression-level: 0
           retention-days: 3
       - name: Upload checkpoint part 2
-        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part2') != ''
+        if: hashFiles('cpout/part2') != ''
         uses: actions/upload-artifact@v4
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-2
@@ -152,7 +152,7 @@ jobs:
           compression-level: 0
           retention-days: 3
       - name: Upload checkpoint part 3
-        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part3') != ''
+        if: hashFiles('cpout/part3') != ''
         uses: actions/upload-artifact@v4
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-3
@@ -160,7 +160,7 @@ jobs:
           compression-level: 0
           retention-days: 3
       - name: Upload checkpoint part 4
-        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part4') != ''
+        if: hashFiles('cpout/part4') != ''
         uses: actions/upload-artifact@v4
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-4
@@ -168,7 +168,7 @@ jobs:
           compression-level: 0
           retention-days: 3
       - name: Upload checkpoint part 5
-        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part5') != ''
+        if: hashFiles('cpout/part5') != ''
         uses: actions/upload-artifact@v4
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-5

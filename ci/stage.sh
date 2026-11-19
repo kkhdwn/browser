@@ -30,6 +30,7 @@ case "$ARCH" in
   *) echo "unsupported arch: $ARCH" >&2; exit 2 ;;
 esac
 
+CHROMIUM_URL="${CHROMIUM_URL:-https://chromium.googlesource.com/chromium/src.git}"
 CARGS="$ROOT/args.gn"
 PIN="$(tr -d '[:space:]' < "$ROOT/chromium.pin")"
 VERSION="${VERSION:-$PIN}"
@@ -87,10 +88,38 @@ sudo rm -rf /var/lib/apt/lists/*
 # ---------------------------------------------------------------------------
 # chromium checkout at the pinned version
 # ---------------------------------------------------------------------------
+# gclient state lives next to src (not inside it, so it is cheap to recreate).
+cat > "$BUILD/.gclient" <<GCLIENT
+solutions = [
+  {
+    "name": "src",
+    "url": "$CHROMIUM_URL",
+    "managed": False,
+    "custom_deps": {},
+    "custom_vars": {},
+  },
+]
+target_os = ["android"]
+GCLIENT
+
 if [ ! -d "$SRC/.git" ]; then
-  log "fetching Chromium (first stage, this takes a while)"
+  # Bootstrap straight at the pinned tag instead of fetching main and then
+  # moving the whole dependency graph. This saves roughly half an hour and a
+  # lot of network on every fresh stage 1.
+  log "bootstrapping Chromium $VERSION (shallow)"
+  mkdir -p "$SRC"
+  cd "$SRC" || fail infra "cd src"
+  git init -q
+  git remote add origin "$CHROMIUM_URL"
+  git config --local gc.auto 0
+  git fetch --depth 1 origin "refs/tags/$VERSION:refs/tags/$VERSION" \
+    || fail fetch "git fetch $VERSION"
+  git checkout -q "refs/tags/$VERSION" || fail checkout "git checkout $VERSION"
+
   cd "$BUILD" || fail infra "cd build"
-  fetch --nohooks --no-history android || fail fetch "gclient fetch"
+  log "gclient sync (first time)"
+  gclient sync -D --no-history --nohooks || fail sync "gclient sync"
+  gclient runhooks || fail sync "gclient runhooks"
 fi
 
 cd "$SRC" || fail infra "cd src"
@@ -107,7 +136,7 @@ if [ "$CURRENT_TAG" != "$VERSION" ]; then
   git checkout -f "$VERSION" || fail checkout "git checkout $VERSION"
   git clean -fdq || true
   log "syncing dependencies for $VERSION"
-  gclient sync -D --no-history --force || fail sync "gclient sync"
+  gclient sync -D --no-history --force --nohooks || fail sync "gclient sync"
   gclient runhooks || fail sync "gclient runhooks"
 fi
 
@@ -156,6 +185,11 @@ else
     124|130|137) log "time budget hit; checkpointing partial build" ;;
     *) fail compile "ninja exited $rc" ;;
   esac
+  # `timeout` only signals autoninja (a Python wrapper); make sure no child
+  # ninja keeps writing into the tree while the checkpoint is being packed.
+  pkill -INT -f '[n]inja' 2>/dev/null || true
+  sleep 5
+  pkill -KILL -f '[n]inja' 2>/dev/null || true
 fi
 
 # ---------------------------------------------------------------------------
