@@ -107,7 +107,7 @@ if [ "$CURRENT_TAG" != "$VERSION" ]; then
   git checkout -f "$VERSION" || fail checkout "git checkout $VERSION"
   git clean -fdq || true
   log "syncing dependencies for $VERSION"
-  gclient sync -D --no-history --shallow --force || fail sync "gclient sync"
+  gclient sync -D --no-history --force || fail sync "gclient sync"
   gclient runhooks || fail sync "gclient runhooks"
 fi
 
