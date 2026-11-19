@@ -24,6 +24,7 @@ if [ "${FREE_GB:-0}" -lt 20 ]; then
   exit 0
 fi
 
+printf '%s\n' "${VERSION:-unknown}" > "$BUILD/.ckpt-version"
 echo "[checkpoint] packing (streamed, no temporary tarball)"
 set -o pipefail
 tar -C "$BUILD" -cf - src 2>/dev/null \

@@ -29,6 +29,10 @@ on:
         description: 'Resume from the checkpoint saved by this earlier run id'
         required: false
         default: ''
+      restore_slot:
+        description: 'Checkpoint slot to restore in stage 1 (a/b, empty = start fresh)'
+        required: false
+        default: ''
       jobs:
         description: 'Parallel compile jobs (3 is safe on 16 GB runners)'
         required: false
@@ -54,7 +58,7 @@ jobs:
       version: ${{ inputs.version }}
       fresh: ${{ inputs.fresh }}
       resume_run_id: ${{ inputs.resume_run_id }}
-      restore_slot: ''
+      restore_slot: ${{ inputs.restore_slot }}
       save_slot: 'a'
       jobs: ${{ inputs.jobs }}
 

@@ -26,5 +26,11 @@ done | zstd -d -T0 | tar -x -C "$BUILD" -f - || {
 }
 
 rm -rf "$ROOT/cp"
+
+CKPT_VERSION="$(cat "$BUILD/.ckpt-version" 2>/dev/null || true)"
+if [ -n "${VERSION:-}" ] && [ -n "$CKPT_VERSION" ] && [ "$CKPT_VERSION" != "$VERSION" ]; then
+  echo "[restore] checkpoint is for Chromium $CKPT_VERSION, wanted $VERSION: discarding it"
+  rm -rf "$BUILD/src" "$BUILD/.ckpt-version"
+fi
 df -h "$BUILD" || true
 echo "[restore] done"

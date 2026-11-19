@@ -181,66 +181,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Pack checkpoint
-        if: steps.prepare.outcome == 'success' && steps.build.outputs.finished != 'true'
-        continue-on-error: true
-        run: bash ci/checkpoint.sh
-
-      - name: Upload checkpoint part 0
-        if: hashFiles('cpout/part0') != ''
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-0
-          path: cpout/part0
-          compression-level: 0
-          retention-days: 3
-      - name: Upload checkpoint part 1
-        if: hashFiles('cpout/part1') != ''
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-1
-          path: cpout/part1
-          compression-level: 0
-          retention-days: 3
-      - name: Upload checkpoint part 2
-        if: hashFiles('cpout/part2') != ''
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-2
-          path: cpout/part2
-          compression-level: 0
-          retention-days: 3
-      - name: Upload checkpoint part 3
-        if: hashFiles('cpout/part3') != ''
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-3
-          path: cpout/part3
-          compression-level: 0
-          retention-days: 3
-      - name: Upload checkpoint part 4
-        if: hashFiles('cpout/part4') != ''
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-4
-          path: cpout/part4
-          compression-level: 0
-          retention-days: 3
-      - name: Upload checkpoint part 5
-        if: hashFiles('cpout/part5') != ''
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-5
-          path: cpout/part5
-          compression-level: 0
-          retention-days: 3
-
       - name: Upload APK
         if: steps.build.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -256,6 +196,66 @@ jobs:
       - name: Update chromium.pin
         if: steps.build.outputs.finished == 'true' && inputs.kind == 'release'
         run: bash ci/pin.sh
+
+      - name: Pack checkpoint
+        if: steps.prepare.outcome == 'success'
+        continue-on-error: true
+        run: bash ci/checkpoint.sh
+
+      - name: Upload checkpoint part 0
+        if: hashFiles('cpout/part0') != ''
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-0
+          path: cpout/part0
+          compression-level: 0
+          retention-days: 14
+      - name: Upload checkpoint part 1
+        if: hashFiles('cpout/part1') != ''
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-1
+          path: cpout/part1
+          compression-level: 0
+          retention-days: 14
+      - name: Upload checkpoint part 2
+        if: hashFiles('cpout/part2') != ''
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-2
+          path: cpout/part2
+          compression-level: 0
+          retention-days: 14
+      - name: Upload checkpoint part 3
+        if: hashFiles('cpout/part3') != ''
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-3
+          path: cpout/part3
+          compression-level: 0
+          retention-days: 14
+      - name: Upload checkpoint part 4
+        if: hashFiles('cpout/part4') != ''
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-4
+          path: cpout/part4
+          compression-level: 0
+          retention-days: 14
+      - name: Upload checkpoint part 5
+        if: hashFiles('cpout/part5') != ''
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-5
+          path: cpout/part5
+          compression-level: 0
+          retention-days: 14
 
       - name: Classify result
         id: classify
