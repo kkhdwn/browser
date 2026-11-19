@@ -125,6 +125,7 @@ jobs:
       - name: Prepare (fetch, patch, gn)
         id: prepare
         continue-on-error: true
+        timeout-minutes: 75
         run: bash ci/stage.sh prepare
 
       - name: Diagnose prepare failure
