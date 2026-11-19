@@ -1,4 +1,5 @@
 name: Build
+run-name: Build ${{ inputs.arch }} (${{ inputs.kind }})
 
 on:
   workflow_dispatch:
