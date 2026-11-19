@@ -123,8 +123,18 @@ fi
 # checkout, and is required before gclient/gn can run.
 if [ ! -f "$BUILD/depot_tools/python3_bin_reldir.txt" ]; then
   log "bootstrapping depot_tools"
-  ( cd "$BUILD/depot_tools" && timeout 900 ./ensure_bootstrap ) || fail fetch "depot_tools bootstrap"
-  [ -f "$BUILD/depot_tools/python3_bin_reldir.txt" ] || fail fetch "depot_tools bootstrap left no python3 marker"
+  # ensure_bootstrap is noisy: gsutil.py tries to call luci-auth before it has
+  # been downloaded, prints a traceback, and then succeeds anyway. Keep that
+  # out of the build log, but show it if the bootstrap actually fails.
+  if ! ( cd "$BUILD/depot_tools" && timeout 900 ./ensure_bootstrap \
+           > "$BUILD/bootstrap.log" 2>&1 ); then
+    tail -n 40 "$BUILD/bootstrap.log" || true
+    fail fetch "depot_tools bootstrap"
+  fi
+  if [ ! -f "$BUILD/depot_tools/python3_bin_reldir.txt" ]; then
+    tail -n 40 "$BUILD/bootstrap.log" || true
+    fail fetch "depot_tools bootstrap left no python3 marker"
+  fi
 fi
 export DEPOT_TOOLS_UPDATE=0
 export PATH="$BUILD/depot_tools:$PATH"
