@@ -31,6 +31,10 @@ case "$ARCH" in
 esac
 
 CHROMIUM_URL="${CHROMIUM_URL:-https://chromium.googlesource.com/chromium/src.git}"
+# GitHub's Chromium mirror lives in the same network as the runners and is far
+# more reliable than googlesource for the initial tag fetch. Both serve the
+# exact same commit for a release tag.
+CHROMIUM_MIRROR="${CHROMIUM_MIRROR:-https://github.com/chromium/chromium.git}"
 CARGS="$ROOT/args.gn"
 PIN="$(tr -d '[:space:]' < "$ROOT/chromium.pin")"
 VERSION="${VERSION:-$PIN}"
@@ -46,6 +50,37 @@ mark() { echo "$1" > "$FAILFILE"; }
 fail() { mark "$1"; log "FATAL ($1): ${*:2}"; exit 1; }
 remaining() { echo $(( START_TS + (JOB_TIMEOUT_MIN - CKPT_RESERVE_MIN) * 60 - $(date +%s) )); }
 
+# Fetch the pinned tag, trying the GitHub mirror first and retrying each source.
+fetch_version() {
+  local url attempt
+  for url in "$CHROMIUM_MIRROR" "$CHROMIUM_URL"; do
+    for attempt in 1 2 3; do
+      log "fetching tag $VERSION from $url (attempt $attempt)"
+      if timeout 1800 git -C "$SRC" fetch --depth 1 "$url" \
+          "refs/tags/$VERSION:refs/tags/$VERSION"; then
+        return 0
+      fi
+      sleep $(( attempt * 20 ))
+    done
+  done
+  return 1
+}
+
+# gclient sync is the slowest network step; retrying it is cheaper than losing
+# a stage, because a shallow checkout resumes where it stopped.
+gclient_sync() {
+  local flags="$*" attempt
+  for attempt in 1 2 3; do
+    # shellcheck disable=SC2086
+    if timeout 3600 gclient sync $flags; then
+      return 0
+    fi
+    log "gclient sync failed (attempt $attempt); retrying"
+    sleep $(( attempt * 30 ))
+  done
+  return 1
+}
+
 echo "finished=false" >> "${GITHUB_OUTPUT:-/dev/null}"
 echo "stage=$STAGE arch=$ARCH abi=$ABI version=$VERSION kind=$KIND" | tee "$ROOT/stage-info.txt"
 df -h / "$BUILD" 2>/dev/null || true
@@ -59,9 +94,11 @@ if [ -d "$BUILD/depot_tools" ]; then
 fi
 export JAVA_HOME="$SRC/third_party/jdk/current"
 export PATH="$JAVA_HOME/bin:$PATH"
-# A stalled git connection must fail instead of hanging a 6-hour job.
-export GIT_HTTP_LOW_SPEED_LIMIT=1000
-export GIT_HTTP_LOW_SPEED_TIME=60
+# Googlesource occasionally drops below 1 KB/s for a minute without being
+# dead. Abort only after five minutes of near-zero progress; the hard timeout
+# below still bounds a real hang.
+export GIT_HTTP_LOW_SPEED_LIMIT=50
+export GIT_HTTP_LOW_SPEED_TIME=300
 export GIT_TERMINAL_PROMPT=0
 
 if [ "$MODE" != "build" ]; then
@@ -136,13 +173,12 @@ if [ ! -d "$SRC/.git" ]; then
   git init -q
   git remote add origin "$CHROMIUM_URL"
   git config --local gc.auto 0
-  timeout 1800 git fetch --depth 1 origin "refs/tags/$VERSION:refs/tags/$VERSION" \
-    || fail fetch "git fetch $VERSION"
+  fetch_version || fail fetch "git fetch $VERSION"
   git checkout -q "refs/tags/$VERSION" || fail checkout "git checkout $VERSION"
 
   cd "$BUILD" || fail infra "cd build"
   log "gclient sync (first time)"
-  timeout 3600 gclient sync -D --no-history --nohooks || fail sync "gclient sync"
+  gclient_sync -D --no-history --nohooks || fail sync "gclient sync"
   timeout 1800 gclient runhooks || fail sync "gclient runhooks"
 fi
 
@@ -160,7 +196,7 @@ if [ "$CURRENT_TAG" != "$VERSION" ]; then
   git checkout -f "$VERSION" || fail checkout "git checkout $VERSION"
   git clean -fdq || true
   log "syncing dependencies for $VERSION"
-  timeout 3600 gclient sync -D --no-history --force --nohooks || fail sync "gclient sync"
+  gclient_sync -D --no-history --force --nohooks || fail sync "gclient sync"
   timeout 1800 gclient runhooks || fail sync "gclient runhooks"
 fi
 
