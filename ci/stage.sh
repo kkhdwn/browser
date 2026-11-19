@@ -138,9 +138,23 @@ mkdir -p "$VPYTHON_VIRTUALENV_ROOT" "$CIPD_CACHE_DIR" "$TMPDIR" "$XDG_CACHE_HOME
 # system dependencies (every stage runs on a brand new VM)
 # ---------------------------------------------------------------------------
 log "installing host packages"
+# Fresh runner VMs start apt-daily/unattended-upgrades, which can hold the
+# dpkg lock for a long time. Waiting for it (instead of racing it) is the
+# difference between a three-minute install and a thirty-minute timeout.
+export NEEDRESTART_MODE=a
+log "waiting for the package manager lock"
+sudo systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+sudo pkill -f unattended-upgrade 2>/dev/null || true
+for _ in $(seq 1 120); do
+  if ! sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; then
+    break
+  fi
+  sleep 5
+done
+
 APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
-sudo timeout 600 apt-get update -qq "${APT_OPTS[@]}" || fail infra "apt update"
-sudo DEBIAN_FRONTEND=noninteractive timeout 900 apt-get install -y -qq "${APT_OPTS[@]}" \
+sudo timeout 900 apt-get update -qq "${APT_OPTS[@]}" || fail infra "apt update"
+sudo DEBIAN_FRONTEND=noninteractive timeout 1200 apt-get install -y -qq "${APT_OPTS[@]}" \
   git curl lsb-release file python3 python3-pip zstd unzip xz-utils \
   pkg-config libglib2.0-dev >/dev/null || fail infra "apt install"
 sudo apt-get clean
@@ -203,7 +217,7 @@ fi
 # Android host tools need the full dependency set; safe to re-run.
 if [ -x "$SRC/build/install-build-deps.sh" ]; then
   log "install-build-deps --android"
-  sudo DEBIAN_FRONTEND=noninteractive timeout 1800 \
+  sudo DEBIAN_FRONTEND=noninteractive timeout 2700 \
     "$SRC/build/install-build-deps.sh" --android --no-prompt \
     || fail infra "install-build-deps"
 fi
