@@ -125,7 +125,7 @@ jobs:
       - name: Prepare (fetch, patch, gn)
         id: prepare
         continue-on-error: true
-        timeout-minutes: 90
+        timeout-minutes: 120
         run: bash ci/stage.sh prepare
 
       - name: Diagnose prepare failure
@@ -263,8 +263,10 @@ jobs:
         run: |
           det=false
           kind="$(cat failure-kind 2>/dev/null || echo none)"
+          # Network problems are worth retrying on the next stage; a patch or
+          # a compiler error is not.
           case "$kind" in
-            patch|compile|gn|checkout|tag|fetch|sync) det=true ;;
+            patch|compile|gn|checkout|tag) det=true ;;
           esac
           echo "kind=$kind deterministic=$det"
           echo "deterministic=$det" >> "$GITHUB_OUTPUT"
