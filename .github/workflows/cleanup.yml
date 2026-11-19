@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '41 3 * * *'
   workflow_dispatch:
+    inputs:
+      days:
+        description: 'Age in days before a failed run or issue is pruned'
+        required: false
+        default: '3'
 
 permissions:
   actions: write
@@ -21,9 +26,10 @@ jobs:
       - name: Delete failed runs older than three days
         env:
           GH_TOKEN: ${{ github.token }}
+          DAYS: ${{ inputs.days || '3' }}
         run: |
           set -euo pipefail
-          CUTOFF="$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          CUTOFF="$(date -u -d "${DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)"
           echo "deleting failed or cancelled runs created before $CUTOFF"
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" \
             --jq '.workflow_runs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "startup_failure") | select(.created_at < "'"$CUTOFF"'") | .id' \
@@ -36,9 +42,10 @@ jobs:
       - name: Close build-failure issues older than three days
         env:
           GH_TOKEN: ${{ github.token }}
+          DAYS: ${{ inputs.days || '3' }}
         run: |
           set -euo pipefail
-          CUTOFF="$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          CUTOFF="$(date -u -d "${DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)"
           gh issue list -R "$GITHUB_REPOSITORY" --label build-failure --state open \
             --json number,createdAt --limit 100 \
             --jq '.[] | select(.createdAt < "'"$CUTOFF"'") | .number' \
