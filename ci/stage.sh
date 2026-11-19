@@ -52,6 +52,14 @@ df -h / "$BUILD" 2>/dev/null || true
 
 MODE="${1:-all}"
 
+# Toolchain paths must be available to both invocations: `prepare` fetches and
+# configures the tree, `build` compiles and signs it in a separate process.
+if [ -d "$BUILD/depot_tools" ]; then
+  export PATH="$BUILD/depot_tools:$PATH"
+fi
+export JAVA_HOME="$SRC/third_party/jdk/current"
+export PATH="$JAVA_HOME/bin:$PATH"
+
 if [ "$MODE" != "build" ]; then
 # ---------------------------------------------------------------------------
 # fresh start
@@ -83,13 +91,6 @@ export CIPD_CACHE_DIR="$BUILD/.cipd-cache"
 export TMPDIR="$BUILD/.tmp"
 export XDG_CACHE_HOME="$BUILD/.cache"
 mkdir -p "$VPYTHON_VIRTUALENV_ROOT" "$CIPD_CACHE_DIR" "$TMPDIR" "$XDG_CACHE_HOME"
-# The compile step runs in its own invocation with MODE=build, so the toolchain
-# PATH has to be set up outside the MODE != build block.
-if [ -x "$BUILD/depot_tools/autoninja" ]; then
-  export PATH="$BUILD/depot_tools:$PATH"
-fi
-export JAVA_HOME="$SRC/third_party/jdk/current"
-export PATH="$JAVA_HOME/bin:$PATH"
 
 # ---------------------------------------------------------------------------
 # system dependencies (every stage runs on a brand new VM)
@@ -196,6 +197,16 @@ if [ "$MODE" = "prepare" ]; then
   exit 0
 fi
 fi  # MODE != build
+
+if ! command -v autoninja >/dev/null 2>&1; then
+  log "autoninja missing. PATH=$PATH"
+  ls -l "$BUILD/depot_tools/autoninja" 2>&1 || true
+  fail infra "autoninja missing from PATH"
+fi
+if [ ! -f "$OUT/build.ninja" ]; then
+  fail gn "build.ninja missing: the prepare step did not complete"
+fi
+log "toolchain: $(command -v autoninja) | $(command -v gn || true)"
 
 REMAIN="$(remaining)"
 if [ "$REMAIN" -lt 240 ]; then
