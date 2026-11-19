@@ -30,6 +30,8 @@ if [ -n "${GH_TOKEN:-}" ] && [ -n "${GITHUB_REPOSITORY:-}" ]; then
     head -c 40000 "$SUMMARY"
     echo '```'
   } > "$ROOT/issue-body.md"
+  gh label create build-failure -R "$GITHUB_REPOSITORY" --color B60205 \
+    --description "Automated build failure" 2>/dev/null || true
   gh issue create -R "$GITHUB_REPOSITORY" \
     --title "$title" --body-file "$ROOT/issue-body.md" \
     --label build-failure 2>/dev/null \

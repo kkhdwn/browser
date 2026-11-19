@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           CUTOFF="$(date -u -d "${DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)"
-          gh issue list -R "$GITHUB_REPOSITORY" --label build-failure --state open \
+          gh issue list -R "$GITHUB_REPOSITORY" --state open --search '"Build failed:" in:title' \
             --json number,createdAt --limit 100 \
             --jq '.[] | select(.createdAt < "'"$CUTOFF"'") | .number' \
             | while read -r number; do

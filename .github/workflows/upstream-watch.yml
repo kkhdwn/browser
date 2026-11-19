@@ -52,7 +52,7 @@ jobs:
           {
             echo "Android stable moved from \`$(tr -d '[:space:]' < chromium.pin)\` to \`${{ steps.check.outputs.latest }}\`."
             echo
-            echo "A release build starts automatically (set the repository variable \`AUTO_BUILD\` to \`0\` to stop that)."
+            echo "A release build starts automatically once the repository variable \`AUTO_BUILD\` is set to \`1\`."
             echo "If the patch series no longer applies, the build fails and a \`build-failure\` issue is opened."
           } > body.md
           gh issue create -R "$GITHUB_REPOSITORY" --title "$TITLE" --label upstream --body-file body.md
@@ -61,7 +61,7 @@ jobs:
       # new APK without anyone touching the repository. Set the repository
       # variable AUTO_BUILD=0 to switch the automatic build off.
       - name: Start a release build
-        if: steps.check.outputs.newer == 'true' && vars.AUTO_BUILD != '0'
+        if: steps.check.outputs.newer == 'true' && vars.AUTO_BUILD == '1'
         env:
           GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
         run: |
