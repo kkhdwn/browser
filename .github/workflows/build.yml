@@ -36,7 +36,7 @@ on:
       jobs:
         description: 'Parallel compile jobs (3 is safe on 16 GB runners)'
         required: false
-        default: '3'
+        default: '4'
 
 permissions:
   contents: write

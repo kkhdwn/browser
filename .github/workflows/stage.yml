@@ -36,7 +36,7 @@ on:
       jobs:
         required: false
         type: string
-        default: '3'
+        default: '4'
     outputs:
       finished:
         description: 'true once a signed APK exists'
