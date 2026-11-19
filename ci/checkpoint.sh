@@ -12,8 +12,11 @@ OUTD="$ROOT/cpout"
 rm -rf "$OUTD"
 mkdir -p "$OUTD"
 
-if [ ! -d "$BUILD/src/out/Default/obj" ]; then
-  echo "[checkpoint] no compiled tree yet, nothing worth saving"
+# A prepared (or half-prepared) source tree is still worth saving: a retry
+# after a network failure resumes gclient sync instead of downloading every
+# dependency again. out/ is optional.
+if [ ! -d "$BUILD/src/.git" ]; then
+  echo "[checkpoint] no source tree yet, nothing worth saving"
   exit 0
 fi
 
