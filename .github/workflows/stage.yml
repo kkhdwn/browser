@@ -114,7 +114,16 @@ jobs:
       - name: Unpack checkpoint
         run: bash ci/restore.sh
 
-      - name: Build
+      - name: Prepare (fetch, patch, gn)
+        id: prepare
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: bash ci/stage.sh prepare
+
+      - name: Compile and sign
         id: build
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}

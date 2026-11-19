@@ -50,6 +50,9 @@ echo "finished=false" >> "${GITHUB_OUTPUT:-/dev/null}"
 echo "stage=$STAGE arch=$ARCH abi=$ABI version=$VERSION kind=$KIND" | tee "$ROOT/stage-info.txt"
 df -h / "$BUILD" 2>/dev/null || true
 
+MODE="${1:-all}"
+
+if [ "$MODE" != "build" ]; then
 # ---------------------------------------------------------------------------
 # fresh start
 # ---------------------------------------------------------------------------
@@ -171,6 +174,14 @@ sed "s/__TARGET_CPU__/$ARCH/" "$CARGS" > "$OUT/args.gn"
 log "gn gen"
 gn gen "$OUT" || fail gn "gn gen failed"
 cp "$OUT/args.gn" "$DIST/args.used.gn"
+
+if [ "$MODE" = "prepare" ]; then
+  log "prepare complete"
+  echo "finished=false" >> "${GITHUB_OUTPUT:-/dev/null}"
+  mark none
+  exit 0
+fi
+fi  # MODE != build
 
 REMAIN="$(remaining)"
 if [ "$REMAIN" -lt 240 ]; then

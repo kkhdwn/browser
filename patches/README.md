@@ -16,10 +16,16 @@ Rules:
   architectural reference; our patches are written from scratch so this
   repository stays BSD-3-Clause.
 
-Planned series (added once the stock APK build is green):
+Current series:
 
-1. Branding: app label, icon, about page, package-facing strings.
-2. Off-store CRX installs from trusted hosts plus a file picker.
+1. `0001-brand-the-launcher-label` — launcher label is "Browser" instead of
+   the Chromium resource.
+2. `0002-allow-user-downloaded-crx` — a `.crx` the user downloaded (GitHub
+   releases, vendor site) can be installed; the permission prompt still has to
+   be accepted.
+
+Planned:
+
 3. Unpacked extension import from a `.zip` into app storage.
 4. Phone layout fixes for the desktop-android surfaces.
-5. In-app updater against GitHub Releases.
+5. Icon/branding pass and in-app updater against GitHub Releases.

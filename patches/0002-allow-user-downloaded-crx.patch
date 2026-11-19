@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Allow installing a CRX the user downloaded
+
+---
+diff --git a/chrome/browser/download/download_crx_util.cc b/chrome/browser/download/download_crx_util.cc
+--- a/chrome/browser/download/download_crx_util.cc
++++ b/chrome/browser/download/download_crx_util.cc
+@@ -90,7 +90,13 @@
+ }  // namespace
+ 
+ bool OffStoreInstallAllowedByPrefs(Profile* profile, const DownloadItem& item) {
++  // A .crx the user downloaded explicitly (for example from a project's
++  // GitHub releases page) may be installed, the way desktop Chromium allows
++  // it. The install prompt still lists the requested permissions and nothing
++  // is enabled until the user accepts it, so this does not install anything
++  // silently.
+   return g_allow_offstore_install_for_testing ||
++         item.GetURL().SchemeIsHTTPOrHTTPS() || item.GetURL().SchemeIsFile() ||
+          extensions::ExtensionManagementFactory::GetForBrowserContext(profile)
+              ->IsOffstoreInstallAllowed(item.GetURL(), item.GetReferrerUrl());
+ }
