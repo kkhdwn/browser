@@ -1,0 +1,213 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Chromium version to build (empty = chromium.pin)'
+        required: false
+        default: ''
+      arch:
+        description: 'arm64 (phones) or x64 (emulators/Chromebooks)'
+        required: true
+        type: choice
+        options: [arm64, x64]
+        default: arm64
+      kind:
+        description: 'beta (prerelease) or release'
+        required: true
+        type: choice
+        options: [beta, release]
+        default: release
+      fresh:
+        description: 'Ignore any saved build tree and start from scratch'
+        required: false
+        type: boolean
+        default: false
+      resume_run_id:
+        description: 'Resume from the checkpoint saved by this earlier run id'
+        required: false
+        default: ''
+      jobs:
+        description: 'Parallel compile jobs (2 is safe on free runners)'
+        required: false
+        default: '2'
+
+permissions:
+  contents: write
+  actions: read
+  issues: write
+
+concurrency:
+  group: build-${{ inputs.arch }}
+  cancel-in-progress: false
+
+jobs:
+  s01:
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 1
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      fresh: ${{ inputs.fresh }}
+      resume_run_id: ${{ inputs.resume_run_id }}
+      restore_slot: ''
+      save_slot: 'a'
+      jobs: ${{ inputs.jobs }}
+
+  s02:
+    needs: s01
+    if: ${{ !cancelled() && needs.s01.outputs.finished != 'true' && needs.s01.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 2
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'a'
+      save_slot: 'b'
+      jobs: ${{ inputs.jobs }}
+
+  s03:
+    needs: s02
+    if: ${{ !cancelled() && needs.s02.outputs.finished != 'true' && needs.s02.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 3
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'b'
+      save_slot: 'a'
+      jobs: ${{ inputs.jobs }}
+
+  s04:
+    needs: s03
+    if: ${{ !cancelled() && needs.s03.outputs.finished != 'true' && needs.s03.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 4
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'a'
+      save_slot: 'b'
+      jobs: ${{ inputs.jobs }}
+
+  s05:
+    needs: s04
+    if: ${{ !cancelled() && needs.s04.outputs.finished != 'true' && needs.s04.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 5
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'b'
+      save_slot: 'a'
+      jobs: ${{ inputs.jobs }}
+
+  s06:
+    needs: s05
+    if: ${{ !cancelled() && needs.s05.outputs.finished != 'true' && needs.s05.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 6
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'a'
+      save_slot: 'b'
+      jobs: ${{ inputs.jobs }}
+
+  s07:
+    needs: s06
+    if: ${{ !cancelled() && needs.s06.outputs.finished != 'true' && needs.s06.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 7
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'b'
+      save_slot: 'a'
+      jobs: ${{ inputs.jobs }}
+
+  s08:
+    needs: s07
+    if: ${{ !cancelled() && needs.s07.outputs.finished != 'true' && needs.s07.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 8
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'a'
+      save_slot: 'b'
+      jobs: ${{ inputs.jobs }}
+
+  s09:
+    needs: s08
+    if: ${{ !cancelled() && needs.s08.outputs.finished != 'true' && needs.s08.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 9
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'b'
+      save_slot: 'a'
+      jobs: ${{ inputs.jobs }}
+
+  s10:
+    needs: s09
+    if: ${{ !cancelled() && needs.s09.outputs.finished != 'true' && needs.s09.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 10
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'a'
+      save_slot: 'b'
+      jobs: ${{ inputs.jobs }}
+
+  s11:
+    needs: s10
+    if: ${{ !cancelled() && needs.s10.outputs.finished != 'true' && needs.s10.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 11
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'b'
+      save_slot: 'a'
+      jobs: ${{ inputs.jobs }}
+
+  s12:
+    needs: s11
+    if: ${{ !cancelled() && needs.s11.outputs.finished != 'true' && needs.s11.outputs.deterministic != 'true' }}
+    uses: ./.github/workflows/stage.yml
+    secrets: inherit
+    with:
+      stage: 12
+      arch: ${{ inputs.arch }}
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      restore_slot: 'a'
+      save_slot: 'b'
+      jobs: ${{ inputs.jobs }}
+

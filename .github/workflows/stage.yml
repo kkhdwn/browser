@@ -1,0 +1,221 @@
+name: stage
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        required: true
+        type: number
+      arch:
+        required: true
+        type: string
+      kind:
+        required: false
+        type: string
+        default: beta
+      version:
+        required: false
+        type: string
+        default: ''
+      fresh:
+        required: false
+        type: boolean
+        default: false
+      resume_run_id:
+        required: false
+        type: string
+        default: ''
+      restore_slot:
+        required: false
+        type: string
+        default: ''
+      save_slot:
+        required: false
+        type: string
+        default: 'a'
+      jobs:
+        required: false
+        type: string
+        default: '2'
+    outputs:
+      finished:
+        description: 'true once a signed APK exists'
+        value: ${{ jobs.stage.outputs.finished }}
+      deterministic:
+        description: 'true when a retry cannot help'
+        value: ${{ jobs.stage.outputs.deterministic }}
+    secrets:
+      KEYSTORE_B64:
+        required: false
+      KEYSTORE_PASSWORD:
+        required: false
+      KEY_ALIAS:
+        required: false
+      KEY_PASSWORD:
+        required: false
+
+permissions:
+  contents: write
+  actions: read
+  issues: write
+
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.build.outputs.finished }}
+      deterministic: ${{ steps.kind.outputs.deterministic }}
+    env:
+      ARCH: ${{ inputs.arch }}
+      KIND: ${{ inputs.kind }}
+      VERSION: ${{ inputs.version }}
+      STAGE: ${{ inputs.stage }}
+      FRESH: ${{ inputs.fresh }}
+      NINJA_JOBS: ${{ inputs.jobs }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Record stage start
+        run: echo "STAGE_START_TS=$(date +%s)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: '16384'
+          temp-reserve-mb: '2048'
+          swap-size-mb: '6144'
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+          build-mount-path: '${{ github.workspace }}/chromium'
+
+      - name: Reclaim root filesystem
+        run: |
+          for d in /opt/hostedtoolcache /usr/local/share/powershell /usr/share/swift; do
+            [ -e "$d" ] && sudo rm -rf "$d"
+          done
+          df -h /
+
+      - name: Restore checkpoint
+        if: inputs.restore_slot != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cp-${{ inputs.arch }}-${{ inputs.restore_slot }}-*
+          path: ${{ github.workspace }}/cp
+          merge-multiple: true
+          run-id: ${{ inputs.resume_run_id != '' && inputs.resume_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Unpack checkpoint
+        run: bash ci/restore.sh
+
+      - name: Build
+        id: build
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: bash ci/stage.sh
+
+      - name: Pack checkpoint
+        if: steps.build.outputs.finished != 'true'
+        run: bash ci/checkpoint.sh
+
+      - name: Upload checkpoint part 0
+        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part0') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-0
+          path: cpout/part0
+          compression-level: 0
+          retention-days: 3
+      - name: Upload checkpoint part 1
+        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part1') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-1
+          path: cpout/part1
+          compression-level: 0
+          retention-days: 3
+      - name: Upload checkpoint part 2
+        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part2') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-2
+          path: cpout/part2
+          compression-level: 0
+          retention-days: 3
+      - name: Upload checkpoint part 3
+        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part3') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-3
+          path: cpout/part3
+          compression-level: 0
+          retention-days: 3
+      - name: Upload checkpoint part 4
+        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part4') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-4
+          path: cpout/part4
+          compression-level: 0
+          retention-days: 3
+      - name: Upload checkpoint part 5
+        if: steps.build.outputs.finished != 'true' && hashFiles('cpout/part5') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-5
+          path: cpout/part5
+          compression-level: 0
+          retention-days: 3
+
+      - name: Upload APK
+        if: steps.build.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ inputs.arch }}
+          path: dist/*
+          retention-days: 30
+
+      - name: Publish release
+        if: steps.build.outputs.finished == 'true' && (inputs.kind == 'release' || inputs.kind == 'beta')
+        run: bash ci/release.sh
+
+      - name: Update chromium.pin
+        if: steps.build.outputs.finished == 'true' && inputs.kind == 'release'
+        run: bash ci/pin.sh
+
+      - name: Diagnose failure
+        if: failure()
+        run: bash ci/diagnose.sh
+
+      - name: Classify failure
+        id: kind
+        if: always()
+        run: |
+          det=false
+          case "$(cat failure-kind 2>/dev/null || true)" in
+            patch|compile|gn|checkout|tag) det=true ;;
+          esac
+          echo "deterministic=$det" >> "$GITHUB_OUTPUT"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: logs-${{ inputs.arch }}-stage${{ inputs.stage }}
+          path: |
+            build.log
+            failure-summary.txt
+            stage-info.txt
+            dist/args.used.gn
+          if-no-files-found: ignore
+          retention-days: 7

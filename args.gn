@@ -1,0 +1,40 @@
+# Build configuration for kkhdwn/browser.
+#
+# Chromium's own "desktop Android" configuration is what gives us the full
+# extensions stack on Android (see extensions/buildflags/buildflags.gni:
+# enable_desktop_android_extensions = is_desktop_android). We deliberately do
+# NOT set enable_extensions: on Android that flag is for the desktop platform
+# app stack and is not what desktop-android builds use.
+
+target_os = "android"
+target_cpu = "__TARGET_CPU__"
+is_desktop_android = true
+chrome_public_manifest_package = "com.kkhdwn.browser"
+
+is_official_build = true
+is_debug = false
+is_component_build = false
+dcheck_always_on = false
+symbol_level = 0
+blink_symbol_level = 0
+v8_symbol_level = 0
+
+# Reliability first on 4-core free runners: no LTO, no PGO, ninja instead of
+# siso. Revisit once the first release pipeline is green.
+use_thin_lto = false
+chrome_pgo_phase = 0
+use_siso = false
+
+disable_fieldtrial_testing_config = true
+enable_reporting = false
+proprietary_codecs = true
+ffmpeg_branding = "Chrome"
+
+enable_vr = false
+enable_arcore = false
+enable_openxr = false
+enable_cardboard = false
+enable_remoting = false
+build_contextual_search = false
+rtc_build_examples = false
+use_errorprone_java_compiler = false

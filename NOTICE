@@ -1,0 +1,9 @@
+This product includes software developed by the Chromium project
+(https://www.chromium.org/), licensed under the BSD 3-Clause License.
+
+"Chromium" and "Chrome" are trademarks of Google LLC. This project is not
+affiliated with, endorsed by, or sponsored by Google. The application is
+distributed under its own package name and does not use Google branding.
+
+The build configuration and patch series in this repository are original work
+released under the BSD 3-Clause License (see LICENSE).
