@@ -59,6 +59,10 @@ if [ -d "$BUILD/depot_tools" ]; then
 fi
 export JAVA_HOME="$SRC/third_party/jdk/current"
 export PATH="$JAVA_HOME/bin:$PATH"
+# A stalled git connection must fail instead of hanging a 6-hour job.
+export GIT_HTTP_LOW_SPEED_LIMIT=1000
+export GIT_HTTP_LOW_SPEED_TIME=60
+export GIT_TERMINAL_PROMPT=0
 
 if [ "$MODE" != "build" ]; then
 # ---------------------------------------------------------------------------
@@ -82,7 +86,8 @@ fi
 # checkout, and is required before gclient/gn can run.
 if [ ! -f "$BUILD/depot_tools/python3_bin_reldir.txt" ]; then
   log "bootstrapping depot_tools"
-  ( cd "$BUILD/depot_tools" && ./ensure_bootstrap ) || fail fetch "depot_tools bootstrap"
+  ( cd "$BUILD/depot_tools" && timeout 900 ./ensure_bootstrap ) || fail fetch "depot_tools bootstrap"
+  [ -f "$BUILD/depot_tools/python3_bin_reldir.txt" ] || fail fetch "depot_tools bootstrap left no python3 marker"
 fi
 export DEPOT_TOOLS_UPDATE=0
 export PATH="$BUILD/depot_tools:$PATH"
@@ -96,8 +101,9 @@ mkdir -p "$VPYTHON_VIRTUALENV_ROOT" "$CIPD_CACHE_DIR" "$TMPDIR" "$XDG_CACHE_HOME
 # system dependencies (every stage runs on a brand new VM)
 # ---------------------------------------------------------------------------
 log "installing host packages"
-sudo apt-get update -qq || fail infra "apt update"
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+sudo timeout 600 apt-get update -qq "${APT_OPTS[@]}" || fail infra "apt update"
+sudo DEBIAN_FRONTEND=noninteractive timeout 900 apt-get install -y -qq "${APT_OPTS[@]}" \
   git curl lsb-release file python3 python3-pip zstd unzip xz-utils \
   pkg-config libglib2.0-dev >/dev/null || fail infra "apt install"
 sudo apt-get clean
@@ -130,21 +136,21 @@ if [ ! -d "$SRC/.git" ]; then
   git init -q
   git remote add origin "$CHROMIUM_URL"
   git config --local gc.auto 0
-  git fetch --depth 1 origin "refs/tags/$VERSION:refs/tags/$VERSION" \
+  timeout 1800 git fetch --depth 1 origin "refs/tags/$VERSION:refs/tags/$VERSION" \
     || fail fetch "git fetch $VERSION"
   git checkout -q "refs/tags/$VERSION" || fail checkout "git checkout $VERSION"
 
   cd "$BUILD" || fail infra "cd build"
   log "gclient sync (first time)"
-  gclient sync -D --no-history --nohooks || fail sync "gclient sync"
-  gclient runhooks || fail sync "gclient runhooks"
+  timeout 3600 gclient sync -D --no-history --nohooks || fail sync "gclient sync"
+  timeout 1800 gclient runhooks || fail sync "gclient runhooks"
 fi
 
 cd "$SRC" || fail infra "cd src"
 
 if ! git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
   log "fetching tag $VERSION"
-  git fetch --depth 1 origin "refs/tags/$VERSION:refs/tags/$VERSION" \
+  timeout 1800 git fetch --depth 1 origin "refs/tags/$VERSION:refs/tags/$VERSION" \
     || fail fetch "git fetch $VERSION"
 fi
 
@@ -154,14 +160,15 @@ if [ "$CURRENT_TAG" != "$VERSION" ]; then
   git checkout -f "$VERSION" || fail checkout "git checkout $VERSION"
   git clean -fdq || true
   log "syncing dependencies for $VERSION"
-  gclient sync -D --no-history --force --nohooks || fail sync "gclient sync"
-  gclient runhooks || fail sync "gclient runhooks"
+  timeout 3600 gclient sync -D --no-history --force --nohooks || fail sync "gclient sync"
+  timeout 1800 gclient runhooks || fail sync "gclient runhooks"
 fi
 
 # Android host tools need the full dependency set; safe to re-run.
 if [ -x "$SRC/build/install-build-deps.sh" ]; then
   log "install-build-deps --android"
-  sudo DEBIAN_FRONTEND=noninteractive "$SRC/build/install-build-deps.sh" --android --no-prompt \
+  sudo DEBIAN_FRONTEND=noninteractive timeout 1800 \
+    "$SRC/build/install-build-deps.sh" --android --no-prompt \
     || fail infra "install-build-deps"
 fi
 
