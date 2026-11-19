@@ -158,7 +158,7 @@ log "waiting for the package manager lock"
 # its own lock timeout so it can never block a job indefinitely.
 sudo systemctl mask --now apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
 sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
-sudo pkill -9 -f unattended-upgrade 2>/dev/null || true
+sudo pkill -9 -f '[u]nattended-upgrade' 2>/dev/null || true
 printf 'DPkg::Lock::Timeout "600";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99-runner-lock >/dev/null
 for _ in $(seq 1 120); do
   if ! sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; then
@@ -167,9 +167,27 @@ for _ in $(seq 1 120); do
   sleep 5
 done
 
-APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
-sudo timeout 900 apt-get update -qq "${APT_OPTS[@]}" || fail infra "apt update"
-sudo DEBIAN_FRONTEND=noninteractive timeout 1200 apt-get install -y -qq "${APT_OPTS[@]}" \
+APT_OPTS=(-o Acquire::Retries=10 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+
+# Ubuntu's archives regularly answer 503 or serve an index that is one minute
+# ahead of the pool. Both are transient; a bounded retry loop turns them into a
+# delay instead of a lost stage.
+apt_retry() {
+  local desc="$1" limit="$2"; shift 2
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if timeout "$limit" sudo DEBIAN_FRONTEND=noninteractive "$@"; then
+      return 0
+    fi
+    log "apt step '$desc' failed (attempt $attempt); retrying"
+    sudo apt-get -f install -y -qq "${APT_OPTS[@]}" >/dev/null 2>&1 || true
+    sleep $(( attempt * 30 ))
+  done
+  return 1
+}
+
+apt_retry "update" 600 apt-get update -qq "${APT_OPTS[@]}" || fail infra "apt update"
+apt_retry "install host packages" 900 apt-get install -y -qq "${APT_OPTS[@]}" \
   git curl lsb-release file python3 python3-pip zstd unzip xz-utils \
   pkg-config libglib2.0-dev >/dev/null || fail infra "apt install"
 sudo apt-get clean
@@ -232,9 +250,18 @@ fi
 # Android host tools need the full dependency set; safe to re-run.
 if [ -x "$SRC/build/install-build-deps.sh" ]; then
   log "install-build-deps --android"
-  sudo DEBIAN_FRONTEND=noninteractive timeout 2700 \
-    "$SRC/build/install-build-deps.sh" --android --no-prompt \
-    || fail infra "install-build-deps"
+  ird_ok=0
+  for attempt in 1 2 3; do
+    if timeout 2700 sudo DEBIAN_FRONTEND=noninteractive \
+        "$SRC/build/install-build-deps.sh" --android --no-prompt; then
+      ird_ok=1
+      break
+    fi
+    log "install-build-deps failed (attempt $attempt); retrying"
+    sudo apt-get -f install -y -qq "${APT_OPTS[@]}" >/dev/null 2>&1 || true
+    sleep $(( attempt * 60 ))
+  done
+  [ "$ird_ok" = "1" ] || fail infra "install-build-deps"
 fi
 
 # ---------------------------------------------------------------------------
