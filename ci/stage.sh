@@ -220,19 +220,52 @@ if [ "$REMAIN" -lt 240 ]; then
   log "only $((REMAIN/60)) min left; skipping compile to save the checkpoint"
 else
   log "compiling chrome_public_apk with -j$NINJA_JOBS for up to $((REMAIN/60)) min"
+  STALL_SECONDS="${STALL_SECONDS:-1500}"
+  DEADLINE=$(( $(date +%s) + REMAIN ))
+  log "stall watchdog: no output for $((STALL_SECONDS/60)) min fails the stage"
+  autoninja -C "$OUT" -j "$NINJA_JOBS" chrome_public_apk &
+  NINJA_PID=$!
+  last_size=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
+  last_change=$(date +%s)
   rc=0
-  timeout --signal=INT --kill-after=120 "$REMAIN" \
-    autoninja -C "$OUT" -j "$NINJA_JOBS" chrome_public_apk || rc=$?
-  case "$rc" in
-    0) log "compile complete" ;;
-    124|130|137) log "time budget hit; checkpointing partial build" ;;
-    *) fail compile "ninja exited $rc" ;;
-  esac
-  # `timeout` only signals autoninja (a Python wrapper); make sure no child
-  # ninja keeps writing into the tree while the checkpoint is being packed.
+  while kill -0 "$NINJA_PID" 2>/dev/null; do
+    sleep 30
+    size=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
+    if [ "$size" != "$last_size" ]; then
+      last_size=$size
+      last_change=$(date +%s)
+    fi
+    now=$(date +%s)
+    if [ "$now" -ge "$DEADLINE" ]; then
+      log "time budget reached; stopping the compiler"
+      rc=124
+      break
+    fi
+    if [ $(( now - last_change )) -ge "$STALL_SECONDS" ]; then
+      log "no compiler output for $(( (now - last_change) / 60 )) min; treating the build as stalled"
+      rc=125
+      break
+    fi
+  done
+  if [ "$rc" -eq 0 ]; then
+    wait "$NINJA_PID"
+    rc=$?
+  else
+    kill -INT "$NINJA_PID" 2>/dev/null || true
+    sleep 20
+    kill -KILL "$NINJA_PID" 2>/dev/null || true
+  fi
+  # `timeout`/kill only reaches autoninja; make sure no child ninja keeps
+  # writing into the tree while the checkpoint is packed.
   pkill -INT -f '[n]inja' 2>/dev/null || true
   sleep 5
   pkill -KILL -f '[n]inja' 2>/dev/null || true
+  case "$rc" in
+    0) log "compile complete" ;;
+    124|130|137) log "time budget hit; checkpointing the partial build" ;;
+    125) fail stall "no compiler progress for $((STALL_SECONDS/60)) minutes" ;;
+    *) fail compile "ninja exited $rc" ;;
+  esac
 fi
 
 # ---------------------------------------------------------------------------
