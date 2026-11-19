@@ -153,8 +153,13 @@ log "installing host packages"
 # difference between a three-minute install and a thirty-minute timeout.
 export NEEDRESTART_MODE=a
 log "waiting for the package manager lock"
-sudo systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
-sudo pkill -f unattended-upgrade 2>/dev/null || true
+# Timers re-arm themselves after a service is stopped, which is how a second
+# unattended-upgrades run grabbed the lock mid-install. Mask them, and give apt
+# its own lock timeout so it can never block a job indefinitely.
+sudo systemctl mask --now apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+sudo pkill -9 -f unattended-upgrade 2>/dev/null || true
+printf 'DPkg::Lock::Timeout "600";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99-runner-lock >/dev/null
 for _ in $(seq 1 120); do
   if ! sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; then
     break
