@@ -40,7 +40,7 @@ jobs:
       - name: Announce new stable
         if: steps.check.outputs.newer == 'true'
         env:
-          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TITLE="Chromium ${{ steps.check.outputs.latest }} is out"
