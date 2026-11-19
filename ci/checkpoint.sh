@@ -1,6 +1,9 @@
 #!/bin/bash
 # Pack the build tree into part files ready for upload.
-set -euo pipefail
+#
+# This must never be the reason a build is lost: it is best effort, and the
+# next stage can always start from an older checkpoint (or from scratch).
+set -uo pipefail
 
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 BUILD="$ROOT/chromium"
@@ -9,23 +12,30 @@ OUTD="$ROOT/cpout"
 rm -rf "$OUTD"
 mkdir -p "$OUTD"
 
-if [ ! -d "$BUILD/src" ]; then
-  echo "[checkpoint] nothing to save"
+if [ ! -d "$BUILD/src/out/Default/obj" ]; then
+  echo "[checkpoint] no compiled tree yet, nothing worth saving"
   exit 0
 fi
 
-df -h "$BUILD" || true
+FREE_GB=$(df -BG --output=avail "$BUILD" | tail -1 | tr -dc '0-9')
+echo "[checkpoint] free space on build volume: ${FREE_GB}G"
+if [ "${FREE_GB:-0}" -lt 25 ]; then
+  echo "[checkpoint] less than 25G free, skipping the checkpoint to keep the job alive"
+  exit 0
+fi
+
 echo "[checkpoint] packing (streamed, no temporary tarball)"
-# Streamed so the peak disk usage stays at (tree) instead of (tree + archive).
-tar -C "$BUILD" -cf - src .vpython-root 2>/dev/null \
-  | zstd -3 -T0 \
+set -o pipefail
+tar -C "$BUILD" -cf - src 2>/dev/null \
+  | nice -n 10 zstd -3 -T2 \
   | split -b 4000M -d -a 1 - "$OUTD/part"
 
-ls -lh "$OUTD"
+ls -lh "$OUTD" || true
 shopt -s nullglob
 parts=("$OUTD"/part*)
 echo "[checkpoint] ${#parts[@]} part(s)"
 if [ ${#parts[@]} -gt 6 ]; then
-  echo "[checkpoint] ERROR: more than 6 parts; increase the upload steps" >&2
-  exit 1
+  echo "[checkpoint] more than 6 parts; dropping the newest ones is unsafe, so failing soft"
+  rm -rf "$OUTD"
+  exit 0
 fi

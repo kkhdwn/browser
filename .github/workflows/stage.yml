@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 355
     outputs:
       finished: ${{ steps.build.outputs.finished }}
-      deterministic: ${{ steps.kind.outputs.deterministic }}
+      deterministic: ${{ steps.classify.outputs.deterministic }}
     env:
       ARCH: ${{ inputs.arch }}
       KIND: ${{ inputs.kind }}
@@ -74,6 +74,10 @@ jobs:
       FRESH: ${{ inputs.fresh }}
       NINJA_JOBS: ${{ inputs.jobs }}
       GH_TOKEN: ${{ github.token }}
+      KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
     steps:
       - name: Record stage start
         run: echo "STAGE_START_TS=$(date +%s)" >> "$GITHUB_ENV"
@@ -114,31 +118,77 @@ jobs:
       - name: Unpack checkpoint
         run: bash ci/restore.sh
 
+      # Prepare never stops the job on its own: a failure here is reported,
+      # classified, uploaded, and then the job is failed on purpose. Without
+      # that, an unclassified failure used to let the next stage run and
+      # repeat the same work from scratch.
       - name: Prepare (fetch, patch, gn)
         id: prepare
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        continue-on-error: true
         run: bash ci/stage.sh prepare
+
+      - name: Diagnose prepare failure
+        if: steps.prepare.outcome == 'failure'
+        run: bash ci/diagnose.sh
+
+      - name: Upload prepare logs
+        if: steps.prepare.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: logs-${{ inputs.arch }}-stage${{ inputs.stage }}-prepare
+          path: |
+            build.log
+            failure-summary.txt
+            stage-info.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Compile and sign
         id: build
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: bash ci/stage.sh
+        if: steps.prepare.outcome == 'success'
+        run: bash ci/stage.sh build
+
+      - name: Diagnose compile failure
+        if: steps.build.outcome == 'failure'
+        run: bash ci/diagnose.sh
+
+      - name: Show the end of the log
+        if: always()
+        run: |
+          {
+            echo "### Stage ${{ inputs.stage }} (${{ inputs.arch }})"
+            echo
+            echo "prepare: ${{ steps.prepare.outcome }} | compiled: ${{ steps.build.outcome }} | apk: ${{ steps.build.outputs.finished }}"
+            echo
+            echo '```'
+            tail -n 60 build.log 2>/dev/null || echo "no build.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: logs-${{ inputs.arch }}-stage${{ inputs.stage }}
+          path: |
+            build.log
+            failure-summary.txt
+            stage-info.txt
+            dist/args.used.gn
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Pack checkpoint
-        if: always()
+        if: steps.build.outcome == 'success' && steps.build.outputs.finished != 'true'
+        continue-on-error: true
         run: bash ci/checkpoint.sh
 
       - name: Upload checkpoint part 0
         if: hashFiles('cpout/part0') != ''
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-0
           path: cpout/part0
@@ -147,6 +197,7 @@ jobs:
       - name: Upload checkpoint part 1
         if: hashFiles('cpout/part1') != ''
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-1
           path: cpout/part1
@@ -155,6 +206,7 @@ jobs:
       - name: Upload checkpoint part 2
         if: hashFiles('cpout/part2') != ''
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-2
           path: cpout/part2
@@ -163,6 +215,7 @@ jobs:
       - name: Upload checkpoint part 3
         if: hashFiles('cpout/part3') != ''
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-3
           path: cpout/part3
@@ -171,6 +224,7 @@ jobs:
       - name: Upload checkpoint part 4
         if: hashFiles('cpout/part4') != ''
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-4
           path: cpout/part4
@@ -179,6 +233,7 @@ jobs:
       - name: Upload checkpoint part 5
         if: hashFiles('cpout/part5') != ''
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: cp-${{ inputs.arch }}-${{ inputs.save_slot }}-5
           path: cpout/part5
@@ -201,30 +256,20 @@ jobs:
         if: steps.build.outputs.finished == 'true' && inputs.kind == 'release'
         run: bash ci/pin.sh
 
-      - name: Diagnose failure
-        if: failure()
-        run: bash ci/diagnose.sh
-
-      - name: Classify failure
-        id: kind
+      - name: Classify result
+        id: classify
         if: always()
         run: |
           det=false
-          case "$(cat failure-kind 2>/dev/null || true)" in
-            patch|compile|gn|checkout|tag) det=true ;;
+          kind="$(cat failure-kind 2>/dev/null || echo none)"
+          case "$kind" in
+            patch|compile|gn|checkout|tag|fetch|sync) det=true ;;
           esac
+          echo "kind=$kind deterministic=$det"
           echo "deterministic=$det" >> "$GITHUB_OUTPUT"
 
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: logs-${{ inputs.arch }}-stage${{ inputs.stage }}
-          path: |
-            build.log
-            failure-summary.txt
-            stage-info.txt
-            dist/args.used.gn
-          if-no-files-found: ignore
-          retention-days: 7
+      - name: Fail the stage
+        if: steps.prepare.outcome == 'failure'
+        run: |
+          echo "prepare failed; see the log artifact for this stage" >&2
+          exit 1

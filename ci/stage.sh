@@ -64,12 +64,19 @@ fi
 # ---------------------------------------------------------------------------
 # depot_tools + caches (kept outside src so the checkpoint owns them)
 # ---------------------------------------------------------------------------
-export DEPOT_TOOLS_UPDATE=0
 if [ ! -d "$BUILD/depot_tools" ]; then
   log "cloning depot_tools"
   git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git \
     "$BUILD/depot_tools" || fail fetch "depot_tools clone"
 fi
+# depot_tools ships only wrappers; the pinned python3/cipd payload has to be
+# fetched once. `ensure_bootstrap` does exactly that without touching the
+# checkout, and is required before gclient/gn can run.
+if [ ! -f "$BUILD/depot_tools/python3_bin_reldir.txt" ]; then
+  log "bootstrapping depot_tools"
+  ( cd "$BUILD/depot_tools" && ./ensure_bootstrap ) || fail fetch "depot_tools bootstrap"
+fi
+export DEPOT_TOOLS_UPDATE=0
 export PATH="$BUILD/depot_tools:$PATH"
 export VPYTHON_VIRTUALENV_ROOT="$BUILD/.vpython-root"
 export CIPD_CACHE_DIR="$BUILD/.cipd-cache"
