@@ -36,7 +36,7 @@ on:
       jobs:
         required: false
         type: string
-        default: '2'
+        default: '3'
     outputs:
       finished:
         description: 'true once a signed APK exists'
@@ -181,7 +181,7 @@ jobs:
           retention-days: 7
 
       - name: Pack checkpoint
-        if: steps.build.outcome == 'success' && steps.build.outputs.finished != 'true'
+        if: steps.prepare.outcome == 'success' && steps.build.outputs.finished != 'true'
         continue-on-error: true
         run: bash ci/checkpoint.sh
 

@@ -19,15 +19,15 @@ fi
 
 FREE_GB=$(df -BG --output=avail "$BUILD" | tail -1 | tr -dc '0-9')
 echo "[checkpoint] free space on build volume: ${FREE_GB}G"
-if [ "${FREE_GB:-0}" -lt 25 ]; then
-  echo "[checkpoint] less than 25G free, skipping the checkpoint to keep the job alive"
+if [ "${FREE_GB:-0}" -lt 20 ]; then
+  echo "[checkpoint] less than 20G free, skipping the checkpoint to keep the job alive"
   exit 0
 fi
 
 echo "[checkpoint] packing (streamed, no temporary tarball)"
 set -o pipefail
 tar -C "$BUILD" -cf - src 2>/dev/null \
-  | nice -n 10 zstd -3 -T2 \
+  | nice -n 10 zstd -5 -T2 \
   | split -b 4000M -d -a 1 - "$OUTD/part"
 
 ls -lh "$OUTD" || true

@@ -83,6 +83,13 @@ export CIPD_CACHE_DIR="$BUILD/.cipd-cache"
 export TMPDIR="$BUILD/.tmp"
 export XDG_CACHE_HOME="$BUILD/.cache"
 mkdir -p "$VPYTHON_VIRTUALENV_ROOT" "$CIPD_CACHE_DIR" "$TMPDIR" "$XDG_CACHE_HOME"
+# The compile step runs in its own invocation with MODE=build, so the toolchain
+# PATH has to be set up outside the MODE != build block.
+if [ -x "$BUILD/depot_tools/autoninja" ]; then
+  export PATH="$BUILD/depot_tools:$PATH"
+fi
+export JAVA_HOME="$SRC/third_party/jdk/current"
+export PATH="$JAVA_HOME/bin:$PATH"
 
 # ---------------------------------------------------------------------------
 # system dependencies (every stage runs on a brand new VM)

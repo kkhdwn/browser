@@ -29,9 +29,9 @@ on:
         required: false
         default: ''
       jobs:
-        description: 'Parallel compile jobs (2 is safe on free runners)'
+        description: 'Parallel compile jobs (3 is safe on 16 GB runners)'
         required: false
-        default: '2'
+        default: '3'
 
 permissions:
   contents: write
@@ -59,7 +59,7 @@ jobs:
 
   s02:
     needs: s01
-    if: ${{ !cancelled() && needs.s01.outputs.finished != 'true' && needs.s01.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s01.result != 'skipped' && needs.s01.outputs.finished != 'true' && needs.s01.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -73,7 +73,7 @@ jobs:
 
   s03:
     needs: s02
-    if: ${{ !cancelled() && needs.s02.outputs.finished != 'true' && needs.s02.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s02.result != 'skipped' && needs.s02.outputs.finished != 'true' && needs.s02.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -87,7 +87,7 @@ jobs:
 
   s04:
     needs: s03
-    if: ${{ !cancelled() && needs.s03.outputs.finished != 'true' && needs.s03.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s03.result != 'skipped' && needs.s03.outputs.finished != 'true' && needs.s03.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -101,7 +101,7 @@ jobs:
 
   s05:
     needs: s04
-    if: ${{ !cancelled() && needs.s04.outputs.finished != 'true' && needs.s04.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s04.result != 'skipped' && needs.s04.outputs.finished != 'true' && needs.s04.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -115,7 +115,7 @@ jobs:
 
   s06:
     needs: s05
-    if: ${{ !cancelled() && needs.s05.outputs.finished != 'true' && needs.s05.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s05.result != 'skipped' && needs.s05.outputs.finished != 'true' && needs.s05.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -129,7 +129,7 @@ jobs:
 
   s07:
     needs: s06
-    if: ${{ !cancelled() && needs.s06.outputs.finished != 'true' && needs.s06.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s06.result != 'skipped' && needs.s06.outputs.finished != 'true' && needs.s06.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -143,7 +143,7 @@ jobs:
 
   s08:
     needs: s07
-    if: ${{ !cancelled() && needs.s07.outputs.finished != 'true' && needs.s07.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s07.result != 'skipped' && needs.s07.outputs.finished != 'true' && needs.s07.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -157,7 +157,7 @@ jobs:
 
   s09:
     needs: s08
-    if: ${{ !cancelled() && needs.s08.outputs.finished != 'true' && needs.s08.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s08.result != 'skipped' && needs.s08.outputs.finished != 'true' && needs.s08.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -171,7 +171,7 @@ jobs:
 
   s10:
     needs: s09
-    if: ${{ !cancelled() && needs.s09.outputs.finished != 'true' && needs.s09.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s09.result != 'skipped' && needs.s09.outputs.finished != 'true' && needs.s09.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -185,7 +185,7 @@ jobs:
 
   s11:
     needs: s10
-    if: ${{ !cancelled() && needs.s10.outputs.finished != 'true' && needs.s10.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s10.result != 'skipped' && needs.s10.outputs.finished != 'true' && needs.s10.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
@@ -199,7 +199,7 @@ jobs:
 
   s12:
     needs: s11
-    if: ${{ !cancelled() && needs.s11.outputs.finished != 'true' && needs.s11.outputs.deterministic != 'true' }}
+    if: ${{ !cancelled() && needs.s11.result != 'skipped' && needs.s11.outputs.finished != 'true' && needs.s11.outputs.deterministic != 'true' }}
     uses: ./.github/workflows/stage.yml
     secrets: inherit
     with:
