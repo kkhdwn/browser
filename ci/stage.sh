@@ -305,6 +305,17 @@ log "gn gen"
 gn gen "$OUT" || fail gn "gn gen failed"
 cp "$OUT/args.gn" "$DIST/args.used.gn"
 
+# Verify the checkpoint actually reduced the work BEFORE spending hours on it.
+# A dry run costs seconds and turns "did the restore work?" into a number.
+if [ -f "$OUT/build.ninja" ]; then
+  REMAINING="$(ninja -C "$OUT" -n chrome_public_apk 2>/dev/null | wc -l || echo 0)"
+  log "[plan] $REMAINING build steps remain"
+  if [ -n "${CKPT_VERSION:-}" ] && [ "$CKPT_VERSION" = "$VERSION" ] \
+     && [ "${CKPT_PATCHES:-}" = "$PATCH_SHA" ] && [ "$REMAINING" -gt 80000 ]; then
+    log "[plan] WARNING: a checkpoint was restored but almost everything is still dirty"
+  fi
+fi
+
 if [ "$MODE" = "prepare" ]; then
   log "prepare complete"
   echo "finished=false" >> "${GITHUB_OUTPUT:-/dev/null}"
