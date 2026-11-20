@@ -128,6 +128,26 @@ jobs:
         timeout-minutes: 120
         run: bash ci/stage.sh prepare
 
+      - name: Publish plan
+        if: always()
+        run: |
+          if [ -f plan.txt ]; then
+            cat plan.txt >> "$GITHUB_STEP_SUMMARY"
+            tail -n 25 build.log >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload plan
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: plan-${{ inputs.arch }}-stage${{ inputs.stage }}
+          path: |
+            plan.txt
+            build.log
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Diagnose prepare failure
         if: steps.prepare.outcome == 'failure'
         run: bash ci/diagnose.sh

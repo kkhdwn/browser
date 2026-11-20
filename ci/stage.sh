@@ -310,6 +310,8 @@ cp "$OUT/args.gn" "$DIST/args.used.gn"
 if [ -f "$OUT/build.ninja" ]; then
   REMAINING="$(ninja -C "$OUT" -n chrome_public_apk 2>/dev/null | wc -l || echo 0)"
   log "[plan] $REMAINING build steps remain"
+  printf 'remaining_steps=%s\nrestored_checkpoint=%s\n' "$REMAINING" \
+    "${CKPT_VERSION:-none}" > "$ROOT/plan.txt"
   if [ -n "${CKPT_VERSION:-}" ] && [ "$CKPT_VERSION" = "$VERSION" ] \
      && [ "${CKPT_PATCHES:-}" = "$PATCH_SHA" ] && [ "$REMAINING" -gt 80000 ]; then
     log "[plan] WARNING: a checkpoint was restored but almost everything is still dirty"
