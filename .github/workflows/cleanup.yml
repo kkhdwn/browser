@@ -35,6 +35,15 @@ jobs:
             --jq '.workflow_runs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "startup_failure") | select(.created_at < "'"$CUTOFF"'") | .id' \
             | while read -r id; do
                 [ -n "$id" ] || continue
+                # A run that still holds a checkpoint is the only way to resume
+                # that build. Never delete it automatically: checkpoints expire
+                # on their own after 14 days.
+                has_ckpt="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/artifacts" \
+                  --jq '[.artifacts[].name | select(startswith("cp-"))] | length' 2>/dev/null || echo 0)"
+                if [ "${has_ckpt:-0}" != "0" ]; then
+                  echo "keeping run $id: it holds a checkpoint"
+                  continue
+                fi
                 echo "deleting run $id"
                 gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$id" || true
               done
