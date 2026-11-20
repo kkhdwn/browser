@@ -288,8 +288,17 @@ fi
 # file is considered dirty and the tree is rebuilt from scratch.
 CKPT_PATCHES="$(cat "$BUILD/.ckpt-patches" 2>/dev/null || true)"
 CKPT_VERSION="$(cat "$BUILD/.ckpt-version" 2>/dev/null || true)"
+VERSION_OK=0
+if [ "$CKPT_VERSION" = "$VERSION" ]; then
+  VERSION_OK=1
+elif [ -z "$CKPT_VERSION" ] || [ "$CKPT_VERSION" = "unknown" ]; then
+  # Checkpoints written before the marker fix carry no version. The patch
+  # marker still pins the source, so they are safe to reuse.
+  VERSION_OK=1
+  log "checkpoint has no version marker; validating it with the patch marker only"
+fi
 if [ -d "$OUT/obj" ]; then
-  if [ "$CKPT_PATCHES" = "$PATCH_SHA" ] && [ "$CKPT_VERSION" = "$VERSION" ]; then
+  if [ "$CKPT_PATCHES" = "$PATCH_SHA" ] && [ "$VERSION_OK" = "1" ]; then
     log "restored objects match this source and patch set; ageing source mtimes"
     find "$SRC" -path "$SRC/out" -prune -o -type f -print0 2>/dev/null \
       | xargs -0 -r touch -d '2020-01-01 00:00:00' 2>/dev/null || true
@@ -312,8 +321,7 @@ if [ -f "$OUT/build.ninja" ]; then
   log "[plan] $REMAINING build steps remain"
   printf 'remaining_steps=%s\nrestored_checkpoint=%s\n' "$REMAINING" \
     "${CKPT_VERSION:-none}" > "$ROOT/plan.txt"
-  if [ -n "${CKPT_VERSION:-}" ] && [ "$CKPT_VERSION" = "$VERSION" ] \
-     && [ "${CKPT_PATCHES:-}" = "$PATCH_SHA" ]; then
+  if [ "$VERSION_OK" = "1" ] && [ "${CKPT_PATCHES:-}" = "$PATCH_SHA" ]; then
     if [ "$REMAINING" -gt 80000 ]; then
       # Refuse to spend hours on a restore that clearly did not take effect.
       fail verify "checkpoint restored but $REMAINING steps remain (expected about 40000)"

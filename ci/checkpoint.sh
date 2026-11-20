@@ -8,6 +8,7 @@ set -uo pipefail
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 BUILD="$ROOT/chromium"
 OUTD="$ROOT/cpout"
+VERSION="${VERSION:-$(tr -d '[:space:]' < "$ROOT/chromium.pin" 2>/dev/null || true)}"
 
 rm -rf "$OUTD"
 mkdir -p "$OUTD"
