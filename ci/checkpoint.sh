@@ -28,9 +28,11 @@ if [ "${FREE_GB:-0}" -lt 12 ]; then
 fi
 
 printf '%s\n' "${VERSION:-unknown}" > "$BUILD/.ckpt-version"
+PATCH_SHA="$(cat "$ROOT"/patches/*.patch 2>/dev/null | sha256sum | awk '{print $1}')"
+printf '%s\n' "$PATCH_SHA" > "$BUILD/.ckpt-patches"
 echo "[checkpoint] packing (streamed, no temporary tarball)"
 set -o pipefail
-tar -C "$BUILD" -cf - .ckpt-version src/out 2>/dev/null \
+tar -C "$BUILD" -cf - .ckpt-version .ckpt-patches src/out 2>/dev/null \
   | nice -n 10 zstd -6 -T2 \
   | split -b 3000M -d -a 1 - "$OUTD/part"
 

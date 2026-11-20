@@ -283,6 +283,22 @@ fi
 # ---------------------------------------------------------------------------
 # gn + compile
 # ---------------------------------------------------------------------------
+# Ninja decides what to rebuild from mtimes. A restored out/ is only useful if
+# the freshly-checked-out source looks older than the objects, otherwise every
+# file is considered dirty and the tree is rebuilt from scratch.
+CKPT_PATCHES="$(cat "$BUILD/.ckpt-patches" 2>/dev/null || true)"
+CKPT_VERSION="$(cat "$BUILD/.ckpt-version" 2>/dev/null || true)"
+if [ -d "$OUT/obj" ]; then
+  if [ "$CKPT_PATCHES" = "$PATCH_SHA" ] && [ "$CKPT_VERSION" = "$VERSION" ]; then
+    log "restored objects match this source and patch set; ageing source mtimes"
+    find "$SRC" -path "$SRC/out" -prune -o -type f -print0 2>/dev/null \
+      | xargs -0 -r touch -d '2020-01-01 00:00:00' 2>/dev/null || true
+  else
+    log "restored objects do not match this source/patch set; discarding them"
+    rm -rf "$OUT/obj" "$OUT/gen"
+  fi
+fi
+
 mkdir -p "$OUT"
 sed "s/__TARGET_CPU__/$ARCH/" "$CARGS" > "$OUT/args.gn"
 log "gn gen"
