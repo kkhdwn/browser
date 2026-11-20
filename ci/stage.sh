@@ -313,8 +313,11 @@ if [ -f "$OUT/build.ninja" ]; then
   printf 'remaining_steps=%s\nrestored_checkpoint=%s\n' "$REMAINING" \
     "${CKPT_VERSION:-none}" > "$ROOT/plan.txt"
   if [ -n "${CKPT_VERSION:-}" ] && [ "$CKPT_VERSION" = "$VERSION" ] \
-     && [ "${CKPT_PATCHES:-}" = "$PATCH_SHA" ] && [ "$REMAINING" -gt 80000 ]; then
-    log "[plan] WARNING: a checkpoint was restored but almost everything is still dirty"
+     && [ "${CKPT_PATCHES:-}" = "$PATCH_SHA" ]; then
+    if [ "$REMAINING" -gt 80000 ]; then
+      # Refuse to spend hours on a restore that clearly did not take effect.
+      fail verify "checkpoint restored but $REMAINING steps remain (expected about 40000)"
+    fi
   fi
 fi
 

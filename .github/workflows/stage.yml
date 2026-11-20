@@ -286,7 +286,7 @@ jobs:
           # Network problems are worth retrying on the next stage; a patch or
           # a compiler error is not.
           case "$kind" in
-            patch|compile|gn|checkout|tag) det=true ;;
+            patch|compile|gn|checkout|tag|verify) det=true ;;
           esac
           echo "kind=$kind deterministic=$det"
           echo "deterministic=$det" >> "$GITHUB_OUTPUT"
