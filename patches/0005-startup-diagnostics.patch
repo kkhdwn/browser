@@ -1,0 +1,133 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Write startup breadcrumbs and Java crash stacks to Download
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java b/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java
+new file mode 100644
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java
+@@ -0,0 +1,124 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.diagnostics;
++
++import android.app.Activity;
++import android.app.Application;
++import android.content.ContentResolver;
++import android.content.ContentUris;
++import android.content.ContentValues;
++import android.content.Context;
++import android.database.Cursor;
++import android.net.Uri;
++import android.os.Build;
++import android.os.Bundle;
++import android.os.Environment;
++import android.provider.MediaStore;
++
++import java.io.OutputStream;
++import java.io.PrintWriter;
++import java.io.StringWriter;
++import java.nio.charset.StandardCharsets;
++import java.text.SimpleDateFormat;
++import java.util.Date;
++import java.util.Locale;
++
++/**
++ * Startup diagnostics for builds under investigation: breadcrumbs and Java crash stacks are
++ * written to Download/browser-diag.txt so they can be read without a PC. This class is removed
++ * once the startup crash is understood.
++ */
++public final class BrowserDiagnostics {
++    private static final String FILE_NAME = "browser-diag.txt";
++    private static final StringBuilder BUFFER = new StringBuilder();
++    private static Uri sUri;
++    private static Context sApp;
++
++    private BrowserDiagnostics() {}
++
++    public static synchronized void install(Context context) {
++        try {
++            sApp = context.getApplicationContext();
++            final Thread.UncaughtExceptionHandler previous =
++                    Thread.getDefaultUncaughtExceptionHandler();
++            Thread.setDefaultUncaughtExceptionHandler(
++                    (thread, throwable) -> {
++                        StringWriter writer = new StringWriter();
++                        throwable.printStackTrace(new PrintWriter(writer));
++                        append("FATAL in " + thread.getName() + "\n" + writer);
++                        if (previous != null) previous.uncaughtException(thread, throwable);
++                    });
++            append("=== start model=" + Build.MODEL + " sdk=" + Build.VERSION.SDK_INT + " ===");
++            sApp.registerActivityLifecycleCallbacks(
++                    new Application.ActivityLifecycleCallbacks() {
++                        @Override
++                        public void onActivityCreated(Activity activity, Bundle state) {
++                            append("activity created " + activity.getClass().getName());
++                        }
++
++                        @Override
++                        public void onActivityStarted(Activity activity) {
++                            append("activity started " + activity.getClass().getName());
++                        }
++
++                        @Override
++                        public void onActivityResumed(Activity activity) {
++                            append("activity resumed " + activity.getClass().getName());
++                        }
++
++                        @Override
++                        public void onActivityPaused(Activity activity) {}
++
++                        @Override
++                        public void onActivityStopped(Activity activity) {}
++
++                        @Override
++                        public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
++
++                        @Override
++                        public void onActivityDestroyed(Activity activity) {}
++                    });
++        } catch (Throwable ignored) {
++            // Diagnostics must never break startup.
++        }
++    }
++
++    public static synchronized void append(String line) {
++        if (sApp == null) return;
++        try {
++            String stamp = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(new Date());
++            BUFFER.append(stamp).append(' ').append(line).append('\n');
++            if (BUFFER.length() > 200000) BUFFER.delete(0, BUFFER.length() - 200000);
++            ContentResolver resolver = sApp.getContentResolver();
++            Uri uri = ensureUri(resolver);
++            if (uri == null) return;
++            try (OutputStream out = resolver.openOutputStream(uri, "wt")) {
++                if (out != null) out.write(BUFFER.toString().getBytes(StandardCharsets.UTF_8));
++            }
++        } catch (Throwable ignored) {
++            // Ignore.
++        }
++    }
++
++    private static Uri ensureUri(ContentResolver resolver) {
++        if (sUri != null) return sUri;
++        Uri collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
++        try (Cursor cursor = resolver.query(collection, new String[] {MediaStore.Downloads._ID},
++                MediaStore.Downloads.DISPLAY_NAME + "=?", new String[] {FILE_NAME}, null)) {
++            if (cursor != null && cursor.moveToFirst()) {
++                sUri = ContentUris.withAppendedId(collection, cursor.getLong(0));
++                return sUri;
++            }
++        } catch (Throwable ignored) {
++            // Fall through to insert.
++        }
++        ContentValues values = new ContentValues();
++        values.put(MediaStore.Downloads.DISPLAY_NAME, FILE_NAME);
++        values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
++        values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
++        sUri = resolver.insert(collection, values);
++        return sUri;
++    }
++}

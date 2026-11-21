@@ -1,0 +1,15 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Register the diagnostics class
+
+---
+diff --git a/chrome/android/java_sources.gni b/chrome/android/java_sources.gni
+--- a/chrome/android/java_sources.gni
++++ b/chrome/android/java_sources.gni
+@@ -26,3 +26,7 @@
+     "java/src/org/chromium/chrome/browser/vr/VrCompositorDelegateProviderImpl.java",
+   ]
+ }
++
++chrome_java_sources += [
++  "java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java",
++]

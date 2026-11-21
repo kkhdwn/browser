@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Install diagnostics at application startup
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeApplicationImpl.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeApplicationImpl.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeApplicationImpl.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeApplicationImpl.java
+@@ -46,7 +46,10 @@
+ 
+     @Override
+     public void onCreate() {
++        org.chromium.chrome.browser.diagnostics.BrowserDiagnostics.install(this);
+         super.onCreate();
++        org.chromium.chrome.browser.diagnostics.BrowserDiagnostics.append(
++                "ChromeApplicationImpl.onCreate finished");
+ 
+         // This Impl is only instantiated in the browser process; SplitChromeApplication uses the
+         // base Impl for all other processes so that the chrome split is never loaded there.
