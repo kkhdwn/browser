@@ -1,12 +1,12 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-Subject: [PATCH] Write startup breadcrumbs and Java crash stacks to Download
+Subject: [PATCH] Write startup breadcrumbs and crash data to Download
 
 ---
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java b/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,198 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -25,18 +25,26 @@ new file mode 100644
 +import android.os.Environment;
 +import android.provider.MediaStore;
 +
++import org.chromium.base.CommandLine;
++import org.chromium.chrome.browser.flags.ChromeSwitches;
++
++import java.io.ByteArrayOutputStream;
++import java.io.File;
++import java.io.FileInputStream;
 +import java.io.OutputStream;
 +import java.io.PrintWriter;
 +import java.io.StringWriter;
 +import java.nio.charset.StandardCharsets;
 +import java.text.SimpleDateFormat;
++import java.util.ArrayList;
 +import java.util.Date;
++import java.util.List;
 +import java.util.Locale;
 +
 +/**
-+ * Startup diagnostics for builds under investigation: breadcrumbs and Java crash stacks are
-+ * written to Download/browser-diag.txt so they can be read without a PC. This class is removed
-+ * once the startup crash is understood.
++ * Startup diagnostics for builds under investigation: breadcrumbs, Java crash stacks and native
++ * crash dumps are written to the public Download collection so they can be read without a PC.
++ * This class is removed once startup is understood.
 + */
 +public final class BrowserDiagnostics {
 +    private static final String FILE_NAME = "browser-diag.txt";
@@ -59,6 +67,14 @@ new file mode 100644
 +                        if (previous != null) previous.uncaughtException(thread, throwable);
 +                    });
 +            append("=== start model=" + Build.MODEL + " sdk=" + Build.VERSION.SDK_INT + " ===");
++            try {
++                CommandLine.getInstance()
++                        .appendSwitch(ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE);
++                append("first-run flow disabled");
++            } catch (Throwable throwable) {
++                append("could not disable first run: " + throwable);
++            }
++            copyCrashDumps(application);
 +            sApp.registerActivityLifecycleCallbacks(
 +                    new Application.ActivityLifecycleCallbacks() {
 +                        @Override
@@ -128,5 +144,64 @@ new file mode 100644
 +        values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
 +        sUri = resolver.insert(collection, values);
 +        return sUri;
++    }
++
++    private static void copyCrashDumps(Application application) {
++        try {
++            File root = new File(application.getCacheDir(), "Crashpad");
++            if (!root.isDirectory()) {
++                append("no crashpad directory");
++                return;
++            }
++            List<File> dumps = new ArrayList<>();
++            collectDumps(root, dumps, 0);
++            append("native crash dumps found: " + dumps.size());
++            int copied = 0;
++            for (File dump : dumps) {
++                if (copied >= 3) break;
++                byte[] data = readFully(dump);
++                if (data == null || data.length == 0) continue;
++                ContentValues values = new ContentValues();
++                values.put(MediaStore.Downloads.DISPLAY_NAME, "browser-crash-" + dump.getName());
++                values.put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream");
++                values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
++                Uri uri = application.getContentResolver()
++                                  .insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
++                if (uri == null) continue;
++                try (OutputStream out =
++                                application.getContentResolver().openOutputStream(uri, "wt")) {
++                    if (out != null) out.write(data);
++                }
++                append("copied dump " + dump.getName() + " (" + data.length + " bytes)");
++                copied++;
++            }
++        } catch (Throwable throwable) {
++            append("dump copy failed: " + throwable);
++        }
++    }
++
++    private static void collectDumps(File directory, List<File> out, int depth) {
++        if (depth > 4) return;
++        File[] children = directory.listFiles();
++        if (children == null) return;
++        for (File child : children) {
++            if (child.isDirectory()) {
++                collectDumps(child, out, depth + 1);
++            } else if (child.getName().endsWith(".dmp")) {
++                out.add(child);
++            }
++        }
++    }
++
++    private static byte[] readFully(File file) {
++        try (FileInputStream input = new FileInputStream(file)) {
++            ByteArrayOutputStream output = new ByteArrayOutputStream();
++            byte[] chunk = new byte[16384];
++            int read;
++            while ((read = input.read(chunk)) > 0) output.write(chunk, 0, read);
++            return output.toByteArray();
++        } catch (Throwable throwable) {
++            return null;
++        }
 +    }
 +}
