@@ -283,29 +283,32 @@ fi
 # ---------------------------------------------------------------------------
 # gn + compile
 # ---------------------------------------------------------------------------
-# Ninja decides what to rebuild from mtimes. A restored out/ is only useful if
-# the freshly-checked-out source looks older than the objects, otherwise every
-# file is considered dirty and the tree is rebuilt from scratch.
+# Ninja decides what to rebuild from mtimes. Restored objects stay valid if the
+# freshly-checked-out sources look older than them; files touched by the patch
+# series are made newer so ninja rebuilds exactly those (and their dependents).
+HAD_OBJ=0
+[ -d "$OUT/obj" ] && HAD_OBJ=1
 CKPT_PATCHES="$(cat "$BUILD/.ckpt-patches" 2>/dev/null || true)"
 CKPT_VERSION="$(cat "$BUILD/.ckpt-version" 2>/dev/null || true)"
 VERSION_OK=0
 if [ "$CKPT_VERSION" = "$VERSION" ]; then
   VERSION_OK=1
 elif [ -z "$CKPT_VERSION" ] || [ "$CKPT_VERSION" = "unknown" ]; then
-  # Checkpoints written before the marker fix carry no version. The patch
-  # marker still pins the source, so they are safe to reuse.
   VERSION_OK=1
   log "checkpoint has no version marker; validating it with the patch marker only"
 fi
-if [ -d "$OUT/obj" ]; then
-  if [ "$CKPT_PATCHES" = "$PATCH_SHA" ] && [ "$VERSION_OK" = "1" ]; then
-    log "restored objects match this source and patch set; ageing source mtimes"
-    find "$SRC" -path "$SRC/out" -prune -o -type f -print0 2>/dev/null \
-      | xargs -0 -r touch -d '2020-01-01 00:00:00' 2>/dev/null || true
-  else
-    log "restored objects do not match this source/patch set; discarding them"
-    rm -rf "$OUT/obj" "$OUT/gen"
-  fi
+
+PATCH_FILES="$(grep -h '^diff --git ' "$ROOT"/patches/*.patch 2>/dev/null \
+  | awk '{print $3}' | sed 's#^a/##' | sort -u)"
+PREV_PATCH_FILES="$(cat "$BUILD/.ckpt-files" 2>/dev/null || true)"
+
+if [ "$HAD_OBJ" = "1" ] && [ "$VERSION_OK" = "1" ]; then
+  log "reusing restored objects (patch set unchanged: $([ "$CKPT_PATCHES" = "$PATCH_SHA" ] && echo yes || echo no))"
+  find "$SRC" -path "$SRC/out" -prune -o -type f -print0 2>/dev/null \
+    | xargs -0 -r touch -d '2020-01-01 00:00:00' 2>/dev/null || true
+  for f in $PATCH_FILES $PREV_PATCH_FILES; do
+    [ -f "$SRC/$f" ] && touch "$SRC/$f"
+  done
 fi
 
 mkdir -p "$OUT"
@@ -321,7 +324,7 @@ if [ -f "$OUT/build.ninja" ]; then
   log "[plan] $REMAINING build steps remain"
   printf 'remaining_steps=%s\nrestored_checkpoint=%s\n' "$REMAINING" \
     "${CKPT_VERSION:-none}" > "$ROOT/plan.txt"
-  if [ "$VERSION_OK" = "1" ] && [ "${CKPT_PATCHES:-}" = "$PATCH_SHA" ]; then
+  if [ "$HAD_OBJ" = "1" ]; then
     if [ "$REMAINING" -gt 80000 ]; then
       # Refuse to spend hours on a restore that clearly did not take effect.
       fail verify "checkpoint restored but $REMAINING steps remain (expected about 40000)"

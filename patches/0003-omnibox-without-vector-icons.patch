@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Build the omnibox without desktop vector icons
+
+---
+diff --git a/chrome/browser/ui/omnibox/omnibox_edit_model.cc b/chrome/browser/ui/omnibox/omnibox_edit_model.cc
+--- a/chrome/browser/ui/omnibox/omnibox_edit_model.cc
++++ b/chrome/browser/ui/omnibox/omnibox_edit_model.cc
+@@ -2019,11 +2019,16 @@
+     }
+   }
+ 
++#if !BUILDFLAG(IS_ANDROID) || BUILDFLAG(ENABLE_VR)
+   bool is_starred_match = IsStarredMatch(match);
+   const auto& vector_icon_type = match.GetVectorIcon(is_starred_match, turl);
+ 
+   return controller_->client()->GetSizedIcon(vector_icon_type,
+                                              vector_icon_color);
++#else
++  // Vector icons for omnibox matches are not part of the Android build.
++  return gfx::Image();
++#endif
+ }
+ 
+ gfx::Image OmniboxEditModel::GetMatchIconIfExtension(
