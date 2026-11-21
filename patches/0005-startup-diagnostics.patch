@@ -6,7 +6,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/Bro
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,123 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -18,7 +18,6 @@ new file mode 100644
 +import android.content.ContentResolver;
 +import android.content.ContentUris;
 +import android.content.ContentValues;
-+import android.content.Context;
 +import android.database.Cursor;
 +import android.net.Uri;
 +import android.os.Build;
@@ -43,13 +42,13 @@ new file mode 100644
 +    private static final String FILE_NAME = "browser-diag.txt";
 +    private static final StringBuilder BUFFER = new StringBuilder();
 +    private static Uri sUri;
-+    private static Context sApp;
++    private static Application sApp;
 +
 +    private BrowserDiagnostics() {}
 +
-+    public static synchronized void install(Context context) {
++    public static synchronized void install(Application application) {
 +        try {
-+            sApp = context.getApplicationContext();
++            sApp = application;
 +            final Thread.UncaughtExceptionHandler previous =
 +                    Thread.getDefaultUncaughtExceptionHandler();
 +            Thread.setDefaultUncaughtExceptionHandler(

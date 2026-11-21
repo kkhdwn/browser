@@ -9,7 +9,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeApplicati
  
      @Override
      public void onCreate() {
-+        org.chromium.chrome.browser.diagnostics.BrowserDiagnostics.install(this);
++        org.chromium.chrome.browser.diagnostics.BrowserDiagnostics.install(getApplication());
          super.onCreate();
 +        org.chromium.chrome.browser.diagnostics.BrowserDiagnostics.append(
 +                "ChromeApplicationImpl.onCreate finished");
