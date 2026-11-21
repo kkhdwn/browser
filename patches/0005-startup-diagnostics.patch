@@ -6,7 +6,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/Bro
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java
-@@ -0,0 +1,227 @@
+@@ -0,0 +1,238 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -24,6 +24,8 @@ new file mode 100644
 +import android.os.Bundle;
 +import android.os.Environment;
 +import android.provider.MediaStore;
++import android.system.Os;
++import android.system.OsConstants;
 +
 +import org.chromium.base.CommandLine;
 +import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -67,15 +69,24 @@ new file mode 100644
 +                        if (previous != null) previous.uncaughtException(thread, throwable);
 +                    });
 +            append("=== start model=" + Build.MODEL + " sdk=" + Build.VERSION.SDK_INT + " ===");
++            File nativeLog = new File(application.getCacheDir(), "native.log");
++            try {
++                int fd = Os.open(nativeLog.getPath(),
++                        OsConstants.O_WRONLY | OsConstants.O_CREAT | OsConstants.O_TRUNC, 0600);
++                Os.dup2(fd, 2);
++                if (fd > 2) Os.close(fd);
++                append("stderr redirected to " + nativeLog.getPath());
++            } catch (Throwable throwable) {
++                append("could not redirect stderr: " + throwable);
++            }
 +            try {
 +                CommandLine commandLine = CommandLine.getInstance();
 +                commandLine.appendSwitch(ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE);
 +                commandLine.appendSwitch("disable-gpu-sandbox");
-+                commandLine.appendSwitch("enable-logging");
-+                commandLine.appendSwitchWithValue(
-+                        "log-file", new File(application.getCacheDir(), "chrome.log").getPath());
++                commandLine.appendSwitch("in-process-gpu");
++                commandLine.appendSwitchWithValue("enable-logging", "stderr");
 +                commandLine.appendSwitchWithValue("v", "1");
-+                append("first-run disabled, gpu sandbox disabled, native logging enabled");
++                append("first-run disabled, in-process gpu, native logging to stderr");
 +            } catch (Throwable throwable) {
 +                append("could not set switches: " + throwable);
 +            }
@@ -161,8 +172,8 @@ new file mode 100644
 +            List<File> dumps = new ArrayList<>();
 +            collectDumps(root, dumps, 0);
 +            append("native crash dumps found: " + dumps.size());
-+            copyFileToDownloads(application, new File(application.getCacheDir(), "chrome.log"),
-+                    "browser-chrome.log", "text/plain");
++            copyFileToDownloads(application, new File(application.getCacheDir(), "native.log"),
++                    "browser-native.log", "text/plain");
 +            int copied = 0;
 +            for (File dump : dumps) {
 +                if (copied >= 3) break;
