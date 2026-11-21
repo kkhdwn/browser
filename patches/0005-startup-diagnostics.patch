@@ -6,7 +6,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/Bro
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java
-@@ -0,0 +1,198 @@
+@@ -0,0 +1,227 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -68,11 +68,16 @@ new file mode 100644
 +                    });
 +            append("=== start model=" + Build.MODEL + " sdk=" + Build.VERSION.SDK_INT + " ===");
 +            try {
-+                CommandLine.getInstance()
-+                        .appendSwitch(ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE);
-+                append("first-run flow disabled");
++                CommandLine commandLine = CommandLine.getInstance();
++                commandLine.appendSwitch(ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE);
++                commandLine.appendSwitch("disable-gpu-sandbox");
++                commandLine.appendSwitch("enable-logging");
++                commandLine.appendSwitchWithValue(
++                        "log-file", new File(application.getCacheDir(), "chrome.log").getPath());
++                commandLine.appendSwitchWithValue("v", "1");
++                append("first-run disabled, gpu sandbox disabled, native logging enabled");
 +            } catch (Throwable throwable) {
-+                append("could not disable first run: " + throwable);
++                append("could not set switches: " + throwable);
 +            }
 +            copyCrashDumps(application);
 +            sApp.registerActivityLifecycleCallbacks(
@@ -156,6 +161,8 @@ new file mode 100644
 +            List<File> dumps = new ArrayList<>();
 +            collectDumps(root, dumps, 0);
 +            append("native crash dumps found: " + dumps.size());
++            copyFileToDownloads(application, new File(application.getCacheDir(), "chrome.log"),
++                    "browser-chrome.log", "text/plain");
 +            int copied = 0;
 +            for (File dump : dumps) {
 +                if (copied >= 3) break;
@@ -177,6 +184,28 @@ new file mode 100644
 +            }
 +        } catch (Throwable throwable) {
 +            append("dump copy failed: " + throwable);
++        }
++    }
++
++    private static void copyFileToDownloads(
++            Application application, File file, String name, String mimeType) {
++        try {
++            if (!file.isFile() || file.length() == 0) return;
++            byte[] data = readFully(file);
++            if (data == null) return;
++            ContentValues values = new ContentValues();
++            values.put(MediaStore.Downloads.DISPLAY_NAME, name);
++            values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
++            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
++            Uri uri = application.getContentResolver()
++                              .insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
++            if (uri == null) return;
++            try (OutputStream out = application.getContentResolver().openOutputStream(uri, "wt")) {
++                if (out != null) out.write(data);
++            }
++            append("copied " + name + " (" + data.length + " bytes)");
++        } catch (Throwable throwable) {
++            append("copy " + name + " failed: " + throwable);
 +        }
 +    }
 +
