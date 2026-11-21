@@ -6,7 +6,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/Bro
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/diagnostics/BrowserDiagnostics.java
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,239 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -32,6 +32,7 @@ new file mode 100644
 +
 +import java.io.ByteArrayOutputStream;
 +import java.io.File;
++import java.io.FileDescriptor;
 +import java.io.FileInputStream;
 +import java.io.OutputStream;
 +import java.io.PrintWriter;
@@ -71,10 +72,10 @@ new file mode 100644
 +            append("=== start model=" + Build.MODEL + " sdk=" + Build.VERSION.SDK_INT + " ===");
 +            File nativeLog = new File(application.getCacheDir(), "native.log");
 +            try {
-+                int fd = Os.open(nativeLog.getPath(),
++                FileDescriptor fd = Os.open(nativeLog.getPath(),
 +                        OsConstants.O_WRONLY | OsConstants.O_CREAT | OsConstants.O_TRUNC, 0600);
 +                Os.dup2(fd, 2);
-+                if (fd > 2) Os.close(fd);
++                Os.close(fd);
 +                append("stderr redirected to " + nativeLog.getPath());
 +            } catch (Throwable throwable) {
 +                append("could not redirect stderr: " + throwable);
