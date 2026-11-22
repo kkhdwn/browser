@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Keep the address bar on top so the controls never move while typing
+
+---
+diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarPreference.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarPreference.java
+index 1f79e58..84e8fde 100644
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarPreference.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarPreference.java
+@@ -99,9 +99,12 @@ public class AddressBarPreference extends ContainedRadioButtonGroupPreference
+      * configurable for experimental purposes but defaults to top.
+      */
+     public static boolean isToolbarConfiguredToShowOnTop() {
+-        // enumToBoolean is true if position is bottom, but this method wants whether it's on top.
+-        var t = computeToolbarPositionAndSource();
+-        return !isToolbarAtBottom(t);
++        // A bottom-anchored toolbar moves the browser controls around while a form field has
++        // focus, which resizes the page more than once per keystroke. Mobile sites that render
++        // their forms in response to a resize (GoFood, for one) rebuild the input while it is
++        // focused, and the IME connection is dropped mid-typing. Keeping the address bar on top
++        // means the controls never move while typing.
++        return true;
+     }
+ 
+     /** Returns enum representing toolbar position and source (why the toolbar position was set.) */
