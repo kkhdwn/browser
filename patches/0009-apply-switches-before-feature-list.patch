@@ -3,13 +3,50 @@ Subject: [PATCH] Apply command line switches before the feature list is initiali
 
 ---
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
+index 19c3b81..48fa094 100644
 --- a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
-@@ -224,6 +224,7 @@
+@@ -20,6 +20,7 @@ import androidx.annotation.VisibleForTesting;
+ import org.chromium.base.ApplicationState;
+ import org.chromium.base.ApplicationStatus;
+ import org.chromium.base.BundleUtils;
++import org.chromium.base.CommandLine;
+ import org.chromium.base.CommandLineInitUtil;
+ import org.chromium.base.ContextUtils;
+ import org.chromium.base.EarlyTraceEvent;
+@@ -224,6 +225,10 @@ public class SplitCompatApplication extends Application {
              // (see ChildProcessService.java).
              CommandLineInitUtil.initCommandLine(
                      COMMAND_LINE_FILE, SplitCompatApplication::shouldUseDebugFlags);
-+            org.chromium.chrome.browser.diagnostics.BrowserDiagnostics.applyEarlySwitches();
++            // GPU and first-run switches must be on the command line before the feature list
++            // is created in performBrowserProcessPreloading(); switching them on later, from
++            // Application.onCreate, is too late and the values are ignored.
++            applyStartupSwitches();
              PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX);
              // Register for activity lifecycle callbacks. Must be done before any activities are
              // created and is needed only by processes that use the ApplicationStatus api (which
+@@ -386,4 +391,24 @@ public class SplitCompatApplication extends Application {
+             throw new RuntimeException("App out of date, getResources() null, closing app.");
+         }
+     }
++
++    /**
++     * Appends the GPU and startup switches before the feature list is created. The feature list
++     * and GPU initialization both read the command line once, so anything appended later is
++     * silently ignored.
++     */
++    private static void applyStartupSwitches() {
++        try {
++            CommandLine commandLine = CommandLine.getInstance();
++            commandLine.appendSwitch("disable-fre");
++            commandLine.appendSwitchWithValue("use-vulkan", "none");
++            commandLine.appendSwitchWithValue("use-angle", "gles");
++            commandLine.appendSwitchWithValue("disable-features", "Vulkan,SkiaGraphite");
++            commandLine.appendSwitchWithValue("enable-logging", "stderr");
++            commandLine.appendSwitchWithValue("v", "1");
++            commandLine.appendSwitchWithValue("vmodule", "*gl*=2,*gpu*=2,*angle*=2,*viz*=1");
++        } catch (Throwable ignored) {
++            // Never break startup.
++        }
++    }
+ }
