@@ -43,8 +43,14 @@ with a clear message if `autoninja` or `build.ninja` is missing.
 
 - Prepare takes ~15-55 minutes depending on network; compile budget is
   `350 - 60` minutes per stage.
+- Checkpoints are streamed (`tar | zstd -5 | split -b 4000M`), so peak disk is
+  the tree plus the parts, not tree plus archive.
+- Checkpoint is skipped (soft) when the build volume has less than 20 GB free
+  or when no `out/Default/obj` exists yet.
+- Logs are uploaded before packing, so a crash during packing cannot hide the
+  real error.
 
-## 2026-11-22 — startup SIGTRAP on Android 12, cause found
+## 2026-11-22 — startup SIGTRAP on Android 12, first analysis
 
 First run of a shipped APK on real hardware (`b28`, Redmi 9A / `citrus_id`,
 Android 12 / SDK 31, arm64-v8a, PowerVR GE8320).
@@ -87,9 +93,42 @@ Verification: build dispatched on the fixed tree; the APK has to stay up past
 60 s with the launcher label visible and `chrome://version` reachable. If the
 GPU process still refuses to start, the next lever is `--disable-gpu` plus
 software compositing, not another sandbox tweak.
-- Checkpoints are streamed (`tar | zstd -5 | split -b 4000M`), so peak disk is
-  the tree plus the parts, not tree plus archive.
-- Checkpoint is skipped (soft) when the build volume has less than 20 GB free
-  or when no `out/Default/obj` exists yet.
-- Logs are uploaded before packing, so a crash during packing cannot hide the
-  real error.
+
+This analysis was only half right: dropping the in-process switch did bring the
+GPU process up, but it still died. See the next entry.
+
+## 2026-11-22 — resolved: the ES 3.0 context is refused on this driver
+
+`b36`, carrying `0010-allow-es-version-fallback`, stays up on the test phone
+(`citrus_id`, Android 12, Adreno 610 / Vulkan 1.1.128). The line that decides
+it all sits in `gpu/config/gpu_info_collector.cc`:
+
+```cpp
+- attribs.allow_es_version_fallback = false;
++ attribs.allow_es_version_fallback = true;
+```
+
+ANGLE runs its Vulkan backend here and answers `Requested version is not
+supported` / `EGL_BAD_ATTRIBUTE` for the ES 3.0 context the GPU info collection
+asks for. With the fallback disabled that single refusal ends in
+`IntentionallyCrashBrowserForUnusableGpuProcess()`; with it enabled the context
+falls back to ES 2.0 and the GPU process survives.
+
+Measured on the phone after installing `b36`:
+
+- browser process, `:privileged_process0` (GPU) and three renderers alive past
+  45 s;
+- `logcat -b crash` empty;
+- `mCurrentFocus` is the browser window, the UI renders.
+
+What did not work, and why: `--in-process-gpu` moved the failure into
+`gpu_init.cc`; disabling the Vulkan feature made GL selection return
+`(gl=none,angle=none)`; `--use-gl` / `--use-angle` values are not accepted for
+the ANGLE pair in this build; `--disable-gpu` crashed somewhere else. None of
+those could fix it, because the decision happens on a hard-coded attribute
+inside GPU init, not on the command line.
+
+The phone also demonstrated that the separate GPU process does start here —
+`io.dioide.aerium` (Chromium 155) runs a working `:privileged_process0` — so the
+problem was never the device, the sandbox, or the process model.
+
