@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Let the info collection context fall back to a lower ES version
+
+---
+diff --git a/gpu/config/gpu_info_collector.cc b/gpu/config/gpu_info_collector.cc
+index 8b3210f..ba105ea 100644
+--- a/gpu/config/gpu_info_collector.cc
++++ b/gpu/config/gpu_info_collector.cc
+@@ -91,7 +91,10 @@ scoped_refptr<gl::GLSurface> InitializeGLSurface(gl::GLDisplay* display) {
+ scoped_refptr<gl::GLContext> InitializeGLContext(gl::GLSurface* surface) {
+   TRACE_EVENT("gpu,startup", "gpu_info_collector::InitializeGLContext");
+   gl::GLContextAttribs attribs;
+-  attribs.allow_es_version_fallback = false;
++  // Drivers that expose Vulkan through ANGLE can still refuse an ES 3.0 context
++  // (Adreno 610 on Android 12 answers EGL_BAD_ATTRIBUTE). Falling back to a
++  // lower ES version keeps the GPU process alive on those devices.
++  attribs.allow_es_version_fallback = true;
+   scoped_refptr<gl::GLContext> context(
+       gl::init::CreateGLContext(nullptr, surface, attribs));
+   if (!context.get()) {
