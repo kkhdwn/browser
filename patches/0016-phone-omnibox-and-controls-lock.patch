@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Keep the phone omnibox and lock browser controls while accessibility is on
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
+index 361adc0..6f68e07 100644
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
+@@ -23,7 +23,7 @@ import org.chromium.build.annotations.Nullable;
+ import org.chromium.cc.input.BrowserControlsState;
+ import org.chromium.chrome.browser.device.DeviceClassManager;
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
+-import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
++import org.chromium.ui.accessibility.AccessibilityState;
+ import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
+ import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
+ import org.chromium.components.embedder_support.util.UrlUtilities;
+@@ -251,7 +251,12 @@ public class TabStateBrowserControlsVisibilityDelegate extends BrowserControlsVi
+         }
+         // TODO(tedchoc): AccessibilityUtil and DeviceClassManager checks do not belong in Tab
+         //                logic.  They should be moved to application level checks.
+-        if (ChromeAccessibilityUtil.get().isAccessibilityEnabled()) {
++        // Touch exploration is what an accessibility service actually enables on a phone;
++        // UiAutomation (and TalkBack) do not always flip the legacy util flag, and when the
++        // controls stay unlocked they hide and show while a form is being filled, which resizes
++        // the page under the keyboard.
++        if (AccessibilityState.isTouchExplorationEnabled()
++                || AccessibilityState.isComplexUserInteractionServiceEnabled()) {
+             enableHidingBrowserControls = false;
+             flags |= (1 << (int) LockReason.A11Y_ENABLED);
+         }
+diff --git a/components/omnibox/browser/autocomplete_result.cc b/components/omnibox/browser/autocomplete_result.cc
+index 0b24734..a6365fe 100644
+--- a/components/omnibox/browser/autocomplete_result.cc
++++ b/components/omnibox/browser/autocomplete_result.cc
+@@ -79,7 +79,8 @@ using AutocompleteMatchType = omnibox::AutocompleteMatchType;
+ namespace {
+ 
+ constexpr bool is_android_any = !!BUILDFLAG(IS_ANDROID);
+-constexpr bool is_android_desktop = !!BUILDFLAG(IS_DESKTOP_ANDROID);
++// The desktop-android omnibox layout does not fit a phone; keep the phone behaviour.
++constexpr bool is_android_desktop = false;
+ constexpr bool is_android_mobile = is_android_any && !is_android_desktop;
+ constexpr bool is_ios = !!BUILDFLAG(IS_IOS);
+ constexpr bool is_desktop = !(is_android_mobile || is_ios);
+diff --git a/components/omnibox/browser/zero_suggest_verbatim_match_provider.cc b/components/omnibox/browser/zero_suggest_verbatim_match_provider.cc
+index f377592..e926dd4 100644
+--- a/components/omnibox/browser/zero_suggest_verbatim_match_provider.cc
++++ b/components/omnibox/browser/zero_suggest_verbatim_match_provider.cc
+@@ -28,7 +28,8 @@
+ 
+ namespace {
+ constexpr bool is_android = !!BUILDFLAG(IS_ANDROID);
+-constexpr bool is_desktop_android = !!BUILDFLAG(IS_DESKTOP_ANDROID);
++// Match the phone omnibox: no desktop-only suggestions.
++constexpr bool is_desktop_android = false;
+ 
+ // Returns whether specific context is eligible for a verbatim match.
+ // Offers verbatim match for:
