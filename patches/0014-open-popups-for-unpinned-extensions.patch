@@ -1,0 +1,61 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Open action popups for extensions that are not pinned
+
+---
+diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListCoordinator.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListCoordinator.java
+index 348709b..b8122a8 100644
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListCoordinator.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListCoordinator.java
+@@ -226,6 +226,12 @@ public class ExtensionActionListCoordinator implements Destroyable {
+         model.set(ExtensionActionButtonProperties.TOUCH_LISTENER, dragHelper::onTouch);
+     }
+ 
++    /** Returns the anchor a popup uses when its action has no button on the toolbar. */
++    private @Nullable ListMenuButton getFallbackPopupAnchor() {
++        View anchor = mContainer.getRootView().findViewById(R.id.extensions_menu_button);
++        return anchor instanceof ListMenuButton ? (ListMenuButton) anchor : null;
++    }
++
+     public class RecyclerViewDelegate {
+         /**
+          * Retrieves the view representing the button for a specific extension action.
+@@ -238,6 +244,11 @@ public class ExtensionActionListCoordinator implements Destroyable {
+             return ExtensionActionListCoordinator.this.getButtonViewForId(actionId);
+         }
+ 
++        /** Returns the anchor used for popups whose action is not pinned to the toolbar. */
++        public @Nullable ListMenuButton getFallbackPopupAnchor() {
++            return ExtensionActionListCoordinator.this.getFallbackPopupAnchor();
++        }
++
+         /**
+          * Adds a {@link Runnable} to the RecyclerView container that will be executed after a
+          * layout phase or animation cycle completes.
+diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListMediator.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListMediator.java
+index da03f2a..0ef5342 100644
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListMediator.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListMediator.java
+@@ -712,6 +712,12 @@ class ExtensionActionListMediator implements Destroyable {
+ 
+         ListMenuButton buttonView =
+                 (ListMenuButton) mRecyclerViewDelegate.getButtonViewForId(actionId);
++        // An action that is not pinned to the toolbar has no button view. Fall back to the
++        // extensions menu button so a popup opened from the extensions menu still has an anchor.
++        boolean pinnedToToolbar = buttonView != null;
++        if (buttonView == null) {
++            buttonView = mRecyclerViewDelegate.getFallbackPopupAnchor();
++        }
+         if (buttonView == null) {
+             contents.destroy();
+             mActionState = new ActionState.Idle();
+@@ -730,7 +736,9 @@ class ExtensionActionListMediator implements Destroyable {
+         // the "pressed" look while loading the action popup too. For context menu {@link
+         // ListMenuButton} already handles this, but not for popup where we show the window
+         // ourselves.
+-        buttonView.setIsPressed(true);
++        if (pinnedToToolbar) {
++            buttonView.setIsPressed(true);
++        }
+ 
+         ExtensionActionPopup popup =
+                 new ExtensionActionPopup(
