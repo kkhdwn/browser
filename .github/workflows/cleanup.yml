@@ -1,10 +1,12 @@
 name: cleanup
 
 on:
-  schedule:
-    - cron: '41 3 * * *'
   workflow_dispatch:
     inputs:
+      confirm:
+        description: 'Type DELETE to actually prune; anything else only lists'
+        required: false
+        default: 'no'
       days:
         description: 'Age in days before a failed run or issue is pruned'
         required: false
@@ -24,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Delete failed runs older than three days
+        if: inputs.confirm == 'DELETE'
         env:
           GH_TOKEN: ${{ github.token }}
           DAYS: ${{ inputs.days || '3' }}
@@ -49,6 +52,7 @@ jobs:
               done
 
       - name: Close build-failure issues older than three days
+        if: inputs.confirm == 'DELETE'
         env:
           GH_TOKEN: ${{ github.token }}
           DAYS: ${{ inputs.days || '3' }}
