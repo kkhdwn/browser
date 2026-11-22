@@ -30,13 +30,6 @@ enable_reporting = false
 proprietary_codecs = true
 ffmpeg_branding = "Chrome"
 
-# The ANGLE/Vulkan stack on the test device refuses an ES 3.0 context, and GPU
-# init failure is fatal on Android. Building without Vulkan makes the GPU come up
-# through ANGLE over the native GLES driver instead, which is the path Chrome
-# takes on the same hardware.
-enable_vulkan = false
-angle_enable_vulkan = false
-
 enable_vr = false
 enable_arcore = false
 enable_openxr = false
