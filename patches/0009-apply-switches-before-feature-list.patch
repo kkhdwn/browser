@@ -3,7 +3,7 @@ Subject: [PATCH] Apply command line switches before the feature list is initiali
 
 ---
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
-index 19c3b81..48fa094 100644
+index 19c3b81..0286d99 100644
 --- a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
 @@ -20,6 +20,7 @@ import androidx.annotation.VisibleForTesting;
@@ -25,7 +25,7 @@ index 19c3b81..48fa094 100644
              PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX);
              // Register for activity lifecycle callbacks. Must be done before any activities are
              // created and is needed only by processes that use the ApplicationStatus api (which
-@@ -386,4 +391,24 @@ public class SplitCompatApplication extends Application {
+@@ -386,4 +391,27 @@ public class SplitCompatApplication extends Application {
              throw new RuntimeException("App out of date, getResources() null, closing app.");
          }
      }
@@ -39,12 +39,15 @@ index 19c3b81..48fa094 100644
 +        try {
 +            CommandLine commandLine = CommandLine.getInstance();
 +            commandLine.appendSwitch("disable-fre");
++            // The GPU service runs inside the browser process: launching a separate GPU
++            // process fails on this build and Chromium treats that as fatal.
++            commandLine.appendSwitch("in-process-gpu");
 +            commandLine.appendSwitchWithValue("use-vulkan", "none");
 +            commandLine.appendSwitchWithValue("use-angle", "gles");
 +            commandLine.appendSwitchWithValue("disable-features", "Vulkan,SkiaGraphite");
 +            commandLine.appendSwitchWithValue("enable-logging", "stderr");
 +            commandLine.appendSwitchWithValue("v", "1");
-+            commandLine.appendSwitchWithValue("vmodule", "*gl*=2,*gpu*=2,*angle*=2,*viz*=1");
++            commandLine.appendSwitchWithValue("vmodule", "*gl*=2,*gpu*=3,*angle*=2,*child_process*=2");
 +        } catch (Throwable ignored) {
 +            // Never break startup.
 +        }
