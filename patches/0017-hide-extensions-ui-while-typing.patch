@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Keep the extensions UI out of the toolbar while the keyboard is up
+
+---
+diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionsToolbarCoordinatorImpl.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionsToolbarCoordinatorImpl.java
+index 5ab7710..b5b9ef7 100644
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionsToolbarCoordinatorImpl.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionsToolbarCoordinatorImpl.java
+@@ -45,6 +45,7 @@ import org.chromium.components.prefs.PrefChangeRegistrar;
+ import org.chromium.components.prefs.PrefService;
+ import org.chromium.components.user_prefs.UserPrefs;
+ import org.chromium.content_public.browser.selection.SelectionDropdownMenuDelegate;
++import org.chromium.ui.KeyboardVisibilityDelegate;
+ import org.chromium.ui.base.ViewUtils;
+ import org.chromium.ui.base.WindowAndroid;
+ import org.chromium.ui.listmenu.ListMenuButton;
+@@ -138,6 +139,18 @@ public class ExtensionsToolbarCoordinatorImpl
+         extensionsToolbarStub.setLayoutResource(R.layout.extensions_toolbar_container);
+         mContainer = (LinearLayout) extensionsToolbarStub.inflate();
+ 
++        // The toolbar row is measured again every time the keyboard opens, and any change in the
++        // width of this container resizes the page while a form field is focused; sites that
++        // render their forms from a resize then rebuild the focused input and the IME connection
++        // is dropped. Take the extensions UI out of the row for the length of the keyboard
++        // session so the row keeps the size it had before typing started.
++        KeyboardVisibilityDelegate.getInstance()
++                .addKeyboardVisibilityListener(
++                        (showing) -> {
++                            if (mContainer == null) return;
++                            mContainer.setVisibility(showing ? View.GONE : View.VISIBLE);
++                        });
++
+         mExtensionsToolbarBridge = new ExtensionsToolbarBridge(task, profile);
+         mExtensionsToolbarBridge.addObserver(mExtensionsToolbarBridgeObserver);
+ 
