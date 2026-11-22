@@ -156,4 +156,37 @@ popup from the extensions menu, a freshly installed Dark Reader stays out of the
 toolbar, and launching the browser no longer writes anything to `Download/`
 (the diagnostics patches are gone from the series).
 
+## 2026-11-22 — the keyboard closes while typing on a bottom-anchored toolbar
+
+Symptom reported on the GoFood merchant login: tapping the phone number field
+makes the keyboard appear and then close, and the page looks like it reloaded.
+
+Measured on the device through `logcat` and `dumpsys input_method`:
+
+```
+seq  : 4003,0,4003,0,4003,0,4003      <- focus taken and dropped, repeatedly
+ime  : 10000000                       <- keyboard up for under a second
+```
+
+`ToolbarPositionController` keeps the browsing controls at the bottom by
+default in this version, and moves them to the top whenever the state changes.
+Every move changes the height of the content area, so the renderer resizes the
+page more than once while the field is focused; GoFood's form is rendered from
+that resize, the focused input is rebuilt, and the IME connection goes with it.
+
+`0015` pins the address bar to the top (`isToolbarConfiguredToShowOnTop()`
+returns true), so the controls never move while typing. Aerium carries no patch
+for this at all — their build simply behaves, which is why the fix here is to
+remove the moving toolbar from the equation rather than to copy anything.
+
+Verified on `b44`:
+
+```
+bar position : top
+seq          : 4003
+ime          : 1111111111   (8 s, no drop)
+typing       : 1111
+```
+
+
 
