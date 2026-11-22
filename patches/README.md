@@ -23,9 +23,24 @@ Current series:
 2. `0002-allow-user-downloaded-crx` — a `.crx` the user downloaded (GitHub
    releases, vendor site) can be installed; the permission prompt still has to
    be accepted.
+3. `0003-omnibox-without-vector-icons` — omnibox built without the desktop
+   vector icon resources.
+4. `0004-searchbox-without-vector-icons` — same for the searchbox.
+5. `0005-startup-diagnostics` — breadcrumbs, Java stack traces and native
+   stderr are written to `Download/browser-*.{txt,log}`.
+6. `0006-register-diagnostics` — adds `BrowserDiagnostics` to
+   `java_sources.gni`.
+7. `0007-hook-diagnostics` — installs the handler in
+   `ChromeApplicationImpl.onCreate`.
+8. `0008-disable-android-gpu-sandbox-feature` — the experimental Android GPU
+   sandbox is not force-enabled; on some Android 12 devices it keeps the GPU
+   process from starting, which Chromium treats as fatal.
+9. `0009-apply-switches-before-feature-list` — GPU switches are appended right
+   after `CommandLineInitUtil.initCommandLine`, before the feature list is
+   created. Appending them in `onCreate` is too late.
 
 Planned:
 
-3. Unpacked extension import from a `.zip` into app storage.
-4. Phone layout fixes for the desktop-android surfaces.
-5. Icon/branding pass and in-app updater against GitHub Releases.
+10. Unpacked extension import from a `.zip` into app storage.
+11. Phone layout fixes for the desktop-android surfaces.
+12. Icon/branding pass and in-app updater against GitHub Releases.
