@@ -3,19 +3,20 @@ Subject: [PATCH] Do not force-enable the experimental Android GPU sandbox
 
 ---
 diff --git a/chrome/browser/chrome_browser_field_trials.cc b/chrome/browser/chrome_browser_field_trials.cc
+index bb7f9dd..eeb4a91 100644
 --- a/chrome/browser/chrome_browser_field_trials.cc
 +++ b/chrome/browser/chrome_browser_field_trials.cc
-@@ -171,10 +171,9 @@
-   // Enable V8 optimizations for high-end Android Desktop devices.
-   // TODO(crbug.com/425860368): Remove when the feature is stable.
-   feature_overrides.EnableFeature(features::kV8AndroidDesktopHighEndConfig);
+@@ -175,10 +175,9 @@ void ChromeBrowserFieldTrials::RegisterFeatureOverrides(
+   // factors.
+   feature_overrides.EnableFeature(
+       autofill::features::kAutofillAndroidDesktopSuppressAccessoryOnEmpty);
 -  // TODO(crbug.com/445446479): Remove when rollout is complete to all form
 -  // factors.
 -  feature_overrides.EnableFeature(
 -      sandbox::policy::features::kAndroidGpuSandbox);
-+  // The experimental Android GPU sandbox is not enabled in this build: the
-+  // GPU process fails to start with it on some Android 12 devices, and
-+  // Chromium treats a GPU process launch failure as fatal on Android.
-   // TODO(crbug.com/437004266): Remove when the feature is stable.
-   feature_overrides.EnableFeature(
-       features::kAlwaysUseAudioManagerOutputFramesPerBuffer);
++  // The experimental Android GPU sandbox is not enabled in this build: the GPU
++  // process fails to start with it on some Android 12 devices, and Chromium
++  // treats a GPU process launch failure as fatal on Android.
+   // Bypass the WebAudio output buffer, to reduce audio latency.
+   // TODO(crbug.com/436988695): Remove when the long term solution is
+   // implemented.

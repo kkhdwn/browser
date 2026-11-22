@@ -3,9 +3,10 @@ Subject: [PATCH] Brand the launcher label
 
 ---
 diff --git a/chrome/android/java/AndroidManifest.xml b/chrome/android/java/AndroidManifest.xml
+index 4f8d014..1668618 100644
 --- a/chrome/android/java/AndroidManifest.xml
 +++ b/chrome/android/java/AndroidManifest.xml
-@@ -221,7 +221,7 @@
+@@ -221,7 +221,7 @@ by a child template that "extends" this file.
        <application android:name="{% block application_name %}org.chromium.chrome.browser.base.SplitChromeApplication{% endblock %}"
          android:icon="@drawable/ic_launcher"
          android:roundIcon="@drawable/ic_launcher_round"

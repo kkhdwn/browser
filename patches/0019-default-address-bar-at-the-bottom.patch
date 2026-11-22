@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Default the address bar to the bottom of the screen
+
+---
+diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarPreference.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarPreference.java
+index 1f79e58..cf8f1a5 100644
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarPreference.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarPreference.java
+@@ -48,10 +48,11 @@ public class AddressBarPreference extends ContainedRadioButtonGroupPreference
+     private RadioButtonWithDescription mBottomButton;
+     private @HighlightedOption int mHighlightedOption;
+ 
+-    // We choose this as a "default return value" because top omnibox is the default today. Choose
+-    // TOP_SETTINGS because TOP_LONG_PRESS causes an animation (see ToolbarPositionController).
++    // The address bar starts at the bottom on a phone. BOTTOM_SETTINGS is used instead of
++    // BOTTOM_LONG_PRESS because the latter animates the move (see ToolbarPositionController).
++    // Any choice the user makes in the settings screen or with the long press menu still wins.
+     private static final @ToolbarPositionAndSource int DEFAULT_POSITION_AND_SOURCE =
+-            ToolbarPositionAndSource.TOP_SETTINGS;
++            ToolbarPositionAndSource.BOTTOM_SETTINGS;
+ 
+     public AddressBarPreference(Context context, AttributeSet attrs) {
+         super(context, attrs);

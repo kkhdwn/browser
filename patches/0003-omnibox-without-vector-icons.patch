@@ -3,9 +3,10 @@ Subject: [PATCH] Build the omnibox without desktop vector icons
 
 ---
 diff --git a/chrome/browser/ui/omnibox/omnibox_edit_model.cc b/chrome/browser/ui/omnibox/omnibox_edit_model.cc
+index e1d5a40..188010e 100644
 --- a/chrome/browser/ui/omnibox/omnibox_edit_model.cc
 +++ b/chrome/browser/ui/omnibox/omnibox_edit_model.cc
-@@ -2019,11 +2019,16 @@
+@@ -1996,11 +1996,16 @@ gfx::Image OmniboxEditModel::GetMatchIcon(const AutocompleteMatch& match,
      }
    }
  
