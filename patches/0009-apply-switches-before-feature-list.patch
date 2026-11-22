@@ -3,7 +3,7 @@ Subject: [PATCH] Apply command line switches before the feature list is initiali
 
 ---
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
-index 19c3b81..0286d99 100644
+index 19c3b81..5b8532f 100644
 --- a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
 @@ -20,6 +20,7 @@ import androidx.annotation.VisibleForTesting;
@@ -18,36 +18,45 @@ index 19c3b81..0286d99 100644
              // (see ChildProcessService.java).
              CommandLineInitUtil.initCommandLine(
                      COMMAND_LINE_FILE, SplitCompatApplication::shouldUseDebugFlags);
-+            // GPU and first-run switches must be on the command line before the feature list
-+            // is created in performBrowserProcessPreloading(); switching them on later, from
-+            // Application.onCreate, is too late and the values are ignored.
++            // Switches must be on the command line before the feature list is created in
++            // performBrowserProcessPreloading(); appending them from Application.onCreate runs
++            // too late and the values are silently ignored.
 +            applyStartupSwitches();
              PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX);
              // Register for activity lifecycle callbacks. Must be done before any activities are
              // created and is needed only by processes that use the ApplicationStatus api (which
-@@ -386,4 +391,27 @@ public class SplitCompatApplication extends Application {
+@@ -386,4 +391,36 @@ public class SplitCompatApplication extends Application {
              throw new RuntimeException("App out of date, getResources() null, closing app.");
          }
      }
 +
 +    /**
-+     * Appends the GPU and startup switches before the feature list is created. The feature list
-+     * and GPU initialization both read the command line once, so anything appended later is
-+     * silently ignored.
++     * Appends the startup switches and reads the optional switch file. The switch file is a
++     * debugging aid: /data/local/tmp/browser-switches, one switch per line, so the GPU stack can
++     * be exercised without rebuilding. Nothing GPU related is forced by default: the stock
++     * configuration is the one that starts on real devices.
 +     */
 +    private static void applyStartupSwitches() {
 +        try {
 +            CommandLine commandLine = CommandLine.getInstance();
 +            commandLine.appendSwitch("disable-fre");
-+            // The GPU service runs inside the browser process: launching a separate GPU
-+            // process fails on this build and Chromium treats that as fatal.
-+            commandLine.appendSwitch("in-process-gpu");
-+            commandLine.appendSwitchWithValue("use-vulkan", "none");
-+            commandLine.appendSwitchWithValue("use-angle", "gles");
-+            commandLine.appendSwitchWithValue("disable-features", "Vulkan,SkiaGraphite");
 +            commandLine.appendSwitchWithValue("enable-logging", "stderr");
 +            commandLine.appendSwitchWithValue("v", "1");
-+            commandLine.appendSwitchWithValue("vmodule", "*gl*=2,*gpu*=3,*angle*=2,*child_process*=2");
++            commandLine.appendSwitchWithValue("vmodule", "*gpu*=3,*gl*=2,*angle*=2,*child_process*=2");
++            java.io.File extra = new java.io.File("/data/local/tmp/browser-switches");
++            if (extra.isFile()) {
++                for (String line : java.nio.file.Files.readAllLines(extra.toPath())) {
++                    line = line.trim();
++                    if (line.isEmpty() || line.startsWith("#")) continue;
++                    int split = line.indexOf('=');
++                    if (split > 2) {
++                        commandLine.appendSwitchWithValue(
++                                line.substring(2, split), line.substring(split + 1));
++                    } else if (line.startsWith("--")) {
++                        commandLine.appendSwitch(line.substring(2));
++                    }
++                }
++            }
 +        } catch (Throwable ignored) {
 +            // Never break startup.
 +        }
