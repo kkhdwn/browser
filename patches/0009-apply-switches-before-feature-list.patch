@@ -1,0 +1,15 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Apply command line switches before the feature list is initialized
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
+@@ -224,6 +224,7 @@
+             // (see ChildProcessService.java).
+             CommandLineInitUtil.initCommandLine(
+                     COMMAND_LINE_FILE, SplitCompatApplication::shouldUseDebugFlags);
++            org.chromium.chrome.browser.diagnostics.BrowserDiagnostics.applyEarlySwitches();
+             PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX);
+             // Register for activity lifecycle callbacks. Must be done before any activities are
+             // created and is needed only by processes that use the ApplicationStatus api (which
