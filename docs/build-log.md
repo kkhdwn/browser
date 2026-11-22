@@ -132,3 +132,28 @@ The phone also demonstrated that the separate GPU process does start here —
 `io.dioide.aerium` (Chromium 155) runs a working `:privileged_process0` — so the
 problem was never the device, the sandbox, or the process model.
 
+## 2026-11-22 — extensions in the phone toolbar
+
+`b38` onwards hosts the extensions UI in the phone toolbar. Three things were
+missing, all in the layout/plumbing rather than in the extension code:
+
+- `toolbar_phone.xml` had no `extensions_toolbar_container_stub`, so
+  `ToolbarManager` never created a coordinator and `assumeNonNull()` on the
+  result crashed the browser with an NPE when the menu item was tapped
+  (`0011`, `0012`);
+- `ToolbarManager` cast the toolbar to `ToolbarTablet` when creating the
+  coordinator, which cannot work on a phone (`0013`);
+- an action popup could only anchor to a pinned action's button, so an unpinned
+  extension did nothing when tapped in the menu (`0014` anchors the popup to the
+  extensions menu button instead).
+
+Newly installed extensions are no longer pinned automatically:
+`--disable-features=ExtensionsPinnedByDefault` in `0009`, matching the
+`ToolbarActionsModel` check that pins on install.
+
+Verified on the device with `b40`: uBlock Origin Lite unpinned still opens its
+popup from the extensions menu, a freshly installed Dark Reader stays out of the
+toolbar, and launching the browser no longer writes anything to `Download/`
+(the diagnostics patches are gone from the series).
+
+
