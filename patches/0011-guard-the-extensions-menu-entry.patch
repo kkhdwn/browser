@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Do not dereference a missing extensions toolbar coordinator
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+index eb3e578..f9634ec 100644
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+@@ -4800,9 +4800,24 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+         } else if (id == R.id.extensions_menu_menu_id) {
+             ExtensionsToolbarCoordinator coordinator =
+                     assumeNonNull(getToolbarManager()).getExtensionsToolbarCoordinator();
+-            assumeNonNull(coordinator);
+-            coordinator.showExtensionsMenu();
+-            RecordUserAction.record("MobileMenuExtensionsMenu");
++            if (coordinator != null) {
++                coordinator.showExtensionsMenu();
++                RecordUserAction.record("MobileMenuExtensionsMenu");
++            } else {
++                // Phone layouts do not host the extensions toolbar, so there is nothing for
++                // the menu to anchor to. Open the extensions page instead of showing a menu
++                // through a null coordinator.
++                LoadUrlParams params =
++                        new LoadUrlParams(
++                                UrlConstants.CHROME_EXTENSIONS_URL,
++                                PageTransition.AUTO_TOPLEVEL);
++                getTabCreator(/* incognito= */ false)
++                        .createNewTab(
++                                params,
++                                TabLaunchType.FROM_CHROME_UI,
++                                getCurrentTabModel().isIncognito() ? null : currentTab);
++                RecordUserAction.record("MobileMenuManageExtensions");
++            }
+         } else if (id == R.id.manage_extensions_menu_id) {
+             LoadUrlParams params =
+                     new LoadUrlParams(
