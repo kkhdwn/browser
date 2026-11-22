@@ -3,7 +3,7 @@ Subject: [PATCH] Apply command line switches before the feature list is initiali
 
 ---
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
-index 19c3b81..76e0969 100644
+index 19c3b81..3d70926 100644
 --- a/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/base/SplitCompatApplication.java
 @@ -20,6 +20,7 @@ import androidx.annotation.VisibleForTesting;
@@ -40,7 +40,7 @@ index 19c3b81..76e0969 100644
 +        try {
 +            CommandLine commandLine = CommandLine.getInstance();
 +            commandLine.appendSwitch("disable-fre");
-+            commandLine.appendSwitchWithValue("disable-features", "ExtensionsPinnedByDefault");
++            commandLine.appendSwitchWithValue("disable-features", "ExtensionsPinnedByDefault,EdgeToEdgeBottomChin");
 +            java.io.File extra = new java.io.File("/data/local/tmp/browser-switches");
 +            if (extra.isFile()) {
 +                for (String line : java.nio.file.Files.readAllLines(extra.toPath())) {
