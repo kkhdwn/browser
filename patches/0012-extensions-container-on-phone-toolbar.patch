@@ -3,20 +3,19 @@ Subject: [PATCH] Give the phone toolbar an extensions container
 
 ---
 diff --git a/chrome/browser/ui/android/toolbar/java/res/layout/toolbar_phone.xml b/chrome/browser/ui/android/toolbar/java/res/layout/toolbar_phone.xml
-index 9e1f21d..85404b6 100644
+index 9e1f21d..cb4ccbd 100644
 --- a/chrome/browser/ui/android/toolbar/java/res/layout/toolbar_phone.xml
 +++ b/chrome/browser/ui/android/toolbar/java/res/layout/toolbar_phone.xml
-@@ -74,6 +74,13 @@ found in the LICENSE file.
-             android:layout_height="match_parent"
-             android:visibility="gone"/>
+@@ -68,6 +68,12 @@ found in the LICENSE file.
+             style="@style/ToolbarHoverableButton"/>
  
+         <ViewStub
 +        <ViewStub
 +            android:id="@+id/extensions_toolbar_container_stub"
 +            android:inflatedId="@+id/extensions_toolbar_container"
 +            android:layout_width="wrap_content"
-+            android:layout_height="?attr/toolbarButtonHeight"
-+            android:layout_marginVertical="?attr/toolbarButtonMarginVertical"/>
++            android:layout_height="match_parent" />
 +
-         <org.chromium.chrome.browser.toolbar.top.ToggleTabStackButton
-             android:id="@+id/tab_switcher_button"
-             style="@style/ToolbarHoverableButton"
+             android:id="@+id/signin_button_stub"
+             android:layout="@layout/signin_button_view"
+             android:layout_width="wrap_content"
