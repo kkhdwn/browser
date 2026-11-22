@@ -188,5 +188,39 @@ ime          : 1111111111   (8 s, no drop)
 typing       : 1111
 ```
 
+## 2026-11-22 — the real cause is `EdgeToEdgeBottomChin`
+
+The forced top bar above was the wrong fix and has been dropped: the bar belongs
+at the bottom. The bug is upstream and shows up in stock Chrome 158 as well when
+the address bar sits at the bottom.
+
+Isolated with a runtime A/B on the device, no rebuild:
+
+| Configuration | `mInputShown` after tapping the phone field |
+| --- | --- |
+| defaults | `00000000` (keyboard closes again) |
+| `--disable-features=EdgeToEdgeBottomChin` | `11111111` |
+
+With a bottom address bar the edge-to-edge bottom chin changes the content
+height while the keyboard animates in, the page is resized twice, GoFood rebuilds
+its form, and the focused input - together with the IME connection - is gone.
+
+`0009` now ships:
+
+```java
+commandLine.appendSwitchWithValue(
+        "disable-features", "ExtensionsPinnedByDefault,EdgeToEdgeBottomChin");
+```
+
+Verified on `b50`, address bar at the bottom, no switch file on the device:
+
+```
+bar      : bottom (omnibox y=2056)
+seq      : 4003
+ime      : 1111111111
+typing   : 11111
+```
+
+
 
 
