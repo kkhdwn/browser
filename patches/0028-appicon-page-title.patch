@@ -1,5 +1,5 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-Subject: [PATCH] Implement the app icon settings page title
+Subject: [PATCH] Implement the app icon settings page title and animation type
 
 ---
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java b/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
@@ -32,7 +32,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIcon
  
          for (int i = 0; i < STYLES.length; i++) {
              ChromeBasePreference preference = new ChromeBasePreference(context);
-@@ -50,6 +56,11 @@
+@@ -50,6 +56,16 @@
                      });
              screen.addPreference(preference);
          }
@@ -41,6 +41,11 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIcon
 +    @Override
 +    public MonotonicObservableSupplier<String> getPageTitle() {
 +        return mPageTitle;
++    }
++
++    @Override
++    public @AnimationType int getAnimationType() {
++        return AnimationType.PROPERTY;
      }
  
      private static void applyStyle(Context context, int index) {
