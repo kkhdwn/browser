@@ -10,7 +10,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
  import org.chromium.chrome.browser.device.DeviceClassManager;
  import org.chromium.chrome.browser.flags.ChromeFeatureList;
 +import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
- import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
+ import org.chromium.ui.accessibility.AccessibilityState;
  import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
  import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
 @@ -35,6 +36,9 @@
@@ -74,15 +74,3 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
          mTab.addObserver(
                  new TabObserver() {
                      @SuppressLint("HandlerLeak")
-@@ -305,6 +328,11 @@
-             enableHidingBrowserControls = false;
-             flags |= (1 << (int) LockReason.FULLSCREEN_DISABLED);
-         }
-+        if (ChromeSharedPreferences.getInstance()
-+                .readBoolean(PREF_ADDRESS_BAR_ALWAYS_VISIBLE, false)) {
-+            enableHidingBrowserControls = false;
-+            flags |= (1 << (int) LockReason.USER_PINNED_ADDRESS_BAR);
-+        }
- 
-         RecordHistogram.recordBooleanHistogram(
-                 "Android.BrowserControls.LockedByTabState", !enableHidingBrowserControls);
