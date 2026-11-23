@@ -5,19 +5,18 @@ Subject: [PATCH] Wire the address bar visibility switch
 diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarSettingsFragment.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarSettingsFragment.java
 --- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarSettingsFragment.java
 +++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarSettingsFragment.java
-@@ -18,8 +18,11 @@
+@@ -18,8 +18,10 @@
  import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
  import org.chromium.build.annotations.NullMarked;
  import org.chromium.build.annotations.Nullable;
 +import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
  import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
-+import org.chromium.chrome.browser.tab.TabStateBrowserControlsVisibilityDelegate;
  import org.chromium.chrome.browser.toolbar.R;
 +import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
  import org.chromium.components.browser_ui.settings.SettingsUtils;
  import org.chromium.ui.base.DeviceFormFactor;
  
-@@ -39,6 +42,8 @@
+@@ -39,6 +41,8 @@
      @VisibleForTesting static final String PREF_ADDRESS_BAR_HEADER = "address_bar_header";
      @VisibleForTesting static final String PREF_ADDRESS_BAR_PREFERENCE = "address_bar_preference";
      @VisibleForTesting static final String PREF_ADDRESS_BAR_TITLE = "address_bar_title";
@@ -26,7 +25,7 @@ diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/brow
      public static final String HIGHLIGHTED_OPTION = "AddressBarSettingsFragment.HighlightedOption";
  
      private final SettableMonotonicObservableSupplier<String> mPageTitle =
-@@ -55,6 +60,25 @@
+@@ -55,6 +59,18 @@
                  IntentUtils.safeGetInt(getArguments(), HIGHLIGHTED_OPTION, HighlightedOption.NONE);
          ((AddressBarPreference) findPreference(PREF_ADDRESS_BAR_PREFERENCE))
                  .init(highlightedOption);
@@ -35,18 +34,11 @@ diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/brow
 +                (ChromeSwitchPreference) findPreference(PREF_ADDRESS_BAR_ALWAYS_VISIBLE);
 +        alwaysVisible.setChecked(
 +                ChromeSharedPreferences.getInstance()
-+                        .readBoolean(
-+                                TabStateBrowserControlsVisibilityDelegate
-+                                        .PREF_ADDRESS_BAR_ALWAYS_VISIBLE,
-+                                false));
++                        .readBoolean(PREF_ADDRESS_BAR_ALWAYS_VISIBLE, false));
 +        alwaysVisible.setOnPreferenceChangeListener(
 +                (preference, newValue) -> {
 +                    ChromeSharedPreferences.getInstance()
-+                            .writeBoolean(
-+                                    TabStateBrowserControlsVisibilityDelegate
-+                                            .PREF_ADDRESS_BAR_ALWAYS_VISIBLE,
-+                                    (Boolean) newValue);
-+                    TabStateBrowserControlsVisibilityDelegate.refreshAll();
++                            .writeBoolean(PREF_ADDRESS_BAR_ALWAYS_VISIBLE, (Boolean) newValue);
 +                    return true;
 +                });
  

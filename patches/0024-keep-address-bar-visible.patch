@@ -13,40 +13,17 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
  import org.chromium.ui.accessibility.AccessibilityState;
  import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
  import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
-@@ -35,6 +36,9 @@
- 
- import java.lang.annotation.Retention;
- import java.lang.annotation.RetentionPolicy;
-+import java.lang.ref.WeakReference;
-+import java.util.ArrayList;
-+import java.util.List;
- import java.util.Set;
- 
- /**
-@@ -49,6 +53,22 @@
- 
+@@ -50,6 +51,9 @@
      /** The maximum amount of time to wait for a page to load before entering fullscreen. */
      private static final long MAX_FULLSCREEN_LOAD_DELAY_MS = 3000;
-+
-+    /** Preference that keeps the address bar on screen regardless of scrolling. */
-+    public static final String PREF_ADDRESS_BAR_ALWAYS_VISIBLE =
-+            "Chrome.AddressBar.AlwaysVisible";
-+
-+    private static final List<WeakReference<TabStateBrowserControlsVisibilityDelegate>>
-+            sInstances = new ArrayList<>();
-+
-+    /** Re-evaluates the controls constraints for every live tab. */
-+    public static void refreshAll() {
-+        for (WeakReference<TabStateBrowserControlsVisibilityDelegate> reference : sInstances) {
-+            TabStateBrowserControlsVisibilityDelegate delegate = reference.get();
-+            if (delegate != null) delegate.updateVisibilityConstraints();
-+        }
-+        sInstances.removeIf(reference -> reference.get() == null);
-+    }
  
++    /** Mirrors the switch in AddressBarSettingsFragment. */
++    private static final String PREF_ADDRESS_BAR_ALWAYS_VISIBLE = "address_bar_always_visible";
++
      // These values are persisted to logs. Entries should not be renumbered and
      // numeric values should never be reused.
-@@ -61,6 +81,7 @@
+     @IntDef({
+@@ -61,6 +65,7 @@
          LockReason.FULLSCREEN_LOADING,
          LockReason.A11Y_ENABLED,
          LockReason.FULLSCREEN_DISABLED,
@@ -54,7 +31,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
          LockReason.NUM_TOTAL
      })
      @Retention(RetentionPolicy.SOURCE)
-@@ -73,8 +94,9 @@
+@@ -73,8 +78,9 @@
          int FULLSCREEN_LOADING = 5;
          int A11Y_ENABLED = 6;
          int FULLSCREEN_DISABLED = 7;
@@ -66,11 +43,3 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
      }
  
      private static boolean sDisableLoadingCheck;
-@@ -95,6 +117,7 @@
-      */
-     public TabStateBrowserControlsVisibilityDelegate(Tab tab) {
-         mTab = (TabImpl) tab;
-+        sInstances.add(new WeakReference<>(this));
-         mTab.addObserver(
-                 new TabObserver() {
-                     @SuppressLint("HandlerLeak")
