@@ -33,28 +33,64 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
  import org.chromium.ui.accessibility.AccessibilityState;
  import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
  import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
-@@ -50,6 +57,20 @@
+@@ -35,6 +42,9 @@
+ 
+ import java.lang.annotation.Retention;
+ import java.lang.annotation.RetentionPolicy;
++import java.lang.ref.WeakReference;
++import java.util.ArrayList;
++import java.util.List;
+ import java.util.Set;
+ 
+ /**
+@@ -49,6 +59,46 @@
+ 
      /** The maximum amount of time to wait for a page to load before entering fullscreen. */
      private static final long MAX_FULLSCREEN_LOAD_DELAY_MS = 3000;
- 
++
 +    /** Mirrors the switch in AddressBarSettingsFragment. */
 +    private static final String PREF_ADDRESS_BAR_ALWAYS_VISIBLE = "address_bar_always_visible";
 +    private static final String ACTION_ADDRESS_BAR_VISIBILITY_CHANGED =
 +            "com.kkhdwn.browser.ADDRESS_BAR_VISIBILITY_CHANGED";
 +
-+    private final BroadcastReceiver mVisibilityReceiver =
-+            new BroadcastReceiver() {
-+                @Override
-+                public void onReceive(Context context, Intent intent) {
-+                    updateVisibilityConstraints();
-+                }
-+            };
-+    private boolean mVisibilityReceiverRegistered;
++    private static final List<WeakReference<TabStateBrowserControlsVisibilityDelegate>>
++            sInstances = new ArrayList<>();
++    private static BroadcastReceiver sVisibilityReceiver;
++    private static boolean sVisibilityReceiverRegistered;
 +
++    /** Re-evaluates the controls constraints for every live tab. */
++    private static void refreshAll() {
++        for (WeakReference<TabStateBrowserControlsVisibilityDelegate> reference : sInstances) {
++            TabStateBrowserControlsVisibilityDelegate delegate = reference.get();
++            if (delegate != null) delegate.updateVisibilityConstraints();
++        }
++        sInstances.removeIf(reference -> reference.get() == null);
++    }
++
++    private static void ensureVisibilityReceiver() {
++        if (sVisibilityReceiverRegistered) return;
++        try {
++            sVisibilityReceiver =
++                    new BroadcastReceiver() {
++                        @Override
++                        public void onReceive(Context context, Intent intent) {
++                            refreshAll();
++                        }
++                    };
++            ContextCompat.registerReceiver(
++                    ContextUtils.getApplicationContext(),
++                    sVisibilityReceiver,
++                    new IntentFilter(ACTION_ADDRESS_BAR_VISIBILITY_CHANGED),
++                    ContextCompat.RECEIVER_NOT_EXPORTED);
++            sVisibilityReceiverRegistered = true;
++        } catch (Throwable ignored) {
++            // The switch still persists; constraints are refreshed on the next tab event.
++        }
++    }
+ 
      // These values are persisted to logs. Entries should not be renumbered and
      // numeric values should never be reused.
-     @IntDef({
-@@ -61,6 +82,7 @@
+@@ -61,6 +111,7 @@
          LockReason.FULLSCREEN_LOADING,
          LockReason.A11Y_ENABLED,
          LockReason.FULLSCREEN_DISABLED,
@@ -62,7 +98,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
          LockReason.NUM_TOTAL
      })
      @Retention(RetentionPolicy.SOURCE)
-@@ -73,8 +95,9 @@
+@@ -73,8 +124,9 @@
          int FULLSCREEN_LOADING = 5;
          int A11Y_ENABLED = 6;
          int FULLSCREEN_DISABLED = 7;
@@ -74,28 +110,12 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
      }
  
      private static boolean sDisableLoadingCheck;
-@@ -95,6 +118,12 @@
+@@ -95,6 +147,8 @@
       */
      public TabStateBrowserControlsVisibilityDelegate(Tab tab) {
          mTab = (TabImpl) tab;
-+        ContextCompat.registerReceiver(
-+                ContextUtils.getApplicationContext(),
-+                mVisibilityReceiver,
-+                new IntentFilter(ACTION_ADDRESS_BAR_VISIBILITY_CHANGED),
-+                ContextCompat.RECEIVER_NOT_EXPORTED);
-+        mVisibilityReceiverRegistered = true;
++        sInstances.add(new WeakReference<>(this));
++        ensureVisibilityReceiver();
          mTab.addObserver(
                  new TabObserver() {
                      @SuppressLint("HandlerLeak")
-@@ -240,6 +269,11 @@
-                     public void onDestroyed(Tab tab) {
-                         // Remove pending handler actions to prevent memory leaks.
-                         mHandler.removeCallbacksAndMessages(null);
-+                        if (mVisibilityReceiverRegistered) {
-+                            ContextUtils.getApplicationContext()
-+                                    .unregisterReceiver(mVisibilityReceiver);
-+                            mVisibilityReceiverRegistered = false;
-+                        }
-                     }
-                 });
-         onWebContentsUpdated(mTab.getWebContents());
