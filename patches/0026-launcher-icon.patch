@@ -3,7 +3,7 @@ Subject: [PATCH] Use the project icon for the launcher
 
 ---
 diff --git a/chrome/android/java/AndroidManifest.xml b/chrome/android/java/AndroidManifest.xml
-index 1668618..510a867 100644
+index 1668618..379c07a 100644
 --- a/chrome/android/java/AndroidManifest.xml
 +++ b/chrome/android/java/AndroidManifest.xml
 @@ -219,8 +219,8 @@ by a child template that "extends" this file.
@@ -12,12 +12,12 @@ index 1668618..510a867 100644
        <application android:name="{% block application_name %}org.chromium.chrome.browser.base.SplitChromeApplication{% endblock %}"
 -        android:icon="@drawable/ic_launcher"
 -        android:roundIcon="@drawable/ic_launcher_round"
-+        android:icon="@drawable/browser_icon"
-+        android:roundIcon="@drawable/browser_icon"
++        android:icon="@mipmap/browser_icon"
++        android:roundIcon="@mipmap/browser_icon"
          android:label="{% block application_label %}Browser{% endblock %}"
          android:memtagMode="async"
          android:largeHeap="false"
-diff --git a/chrome/android/java/res/drawable-nodpi/browser_icon.png b/chrome/android/java/res/drawable-nodpi/browser_icon.png
+diff --git a/chrome/android/java/res_chromium_base/mipmap-xxxhdpi/browser_icon.png b/chrome/android/java/res_chromium_base/mipmap-xxxhdpi/browser_icon.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..3fa3e9edabb2a7e87cd4457642bc2f3ffc7eb442
 GIT binary patch

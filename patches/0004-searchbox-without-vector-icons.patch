@@ -3,7 +3,7 @@ Subject: [PATCH] Build the searchbox without desktop vector icons
 
 ---
 diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
-index dc0975f..fb5007f 100644
+index dc0975f..2a0382b 100644
 --- a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 +++ b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 @@ -1000,6 +1000,7 @@ SearchboxHandler::CreateAutocompleteMatch(
@@ -22,3 +22,17 @@ index dc0975f..fb5007f 100644
    OverrideIconPaths(match, mojom_match.get());
    mojom_match->icon_url = match.icon_url;
    // For featured enterprise search suggestions, use template url to generate
+@@ -1056,9 +1058,12 @@ SearchboxHandler::CreateAutocompleteMatch(
+       }
+ #endif
+       std::string icon_path;
++#if !BUILDFLAG(IS_ANDROID) || BUILDFLAG(ENABLE_VR)
+       if (action->GetIconImage().IsEmpty()) {
+         icon_path = AutocompleteIconToResourceName(action->GetVectorIcon());
+-      } else {
++      } else
++#endif
++      {
+         icon_path = webui::GetBitmapDataUrl(action->GetIconImage().AsBitmap());
+       }
+       const OmniboxAction::LabelStrings& label_strings =
