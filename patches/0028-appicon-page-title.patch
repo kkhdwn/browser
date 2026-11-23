@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Implement the app icon settings page title
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java b/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
+@@ -14,6 +14,9 @@
+ import androidx.preference.Preference;
+ import androidx.preference.PreferenceScreen;
+ 
++import org.chromium.base.supplier.MonotonicObservableSupplier;
++import org.chromium.base.supplier.ObservableSuppliers;
++import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
+ import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
+ import org.chromium.components.browser_ui.settings.ChromeBasePreference;
+ 
+@@ -23,6 +26,8 @@
+  * manifest and exactly one of them is enabled at a time.
+  */
+ public class AppIconSettingsFragment extends ChromeBaseSettingsFragment {
++    private final SettableMonotonicObservableSupplier<String> mPageTitle =
++            ObservableSuppliers.createMonotonic();
+     private static final String[] STYLES = {"hitam", "biru", "hijau", "kuning", "merah"};
+     private static final int[] TITLES = {
+         org.chromium.chrome.R.string.app_icon_hitam,
+@@ -37,6 +42,7 @@
+         Context context = getContext();
+         PreferenceScreen screen = getPreferenceManager().createPreferenceScreen(context);
+         setPreferenceScreen(screen);
++        mPageTitle.set(context.getString(org.chromium.chrome.R.string.app_icon_settings));
+ 
+         for (int i = 0; i < STYLES.length; i++) {
+             ChromeBasePreference preference = new ChromeBasePreference(context);
+@@ -50,6 +56,11 @@
+                     });
+             screen.addPreference(preference);
+         }
++    }
++
++    @Override
++    public MonotonicObservableSupplier<String> getPageTitle() {
++        return mPageTitle;
+     }
+ 
+     private static void applyStyle(Context context, int index) {
