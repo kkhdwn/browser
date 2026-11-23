@@ -1,0 +1,17 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Guard the omnibox action vector icon on Android
+
+---
+diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
+--- a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
++++ b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
+@@ -1057,7 +1057,9 @@
+ #endif
+       std::string icon_path;
+       if (action->GetIconImage().IsEmpty()) {
++#if !BUILDFLAG(IS_ANDROID) || BUILDFLAG(ENABLE_VR)
+         icon_path = AutocompleteIconToResourceName(action->GetVectorIcon());
++#endif
+       } else {
+         icon_path = webui::GetBitmapDataUrl(action->GetIconImage().AsBitmap());
+       }
