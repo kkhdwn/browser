@@ -1,8 +1,9 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-Subject: [PATCH] Wire the address bar visibility switch
+Subject: [PATCH] Wire the address bar visibility switch to its preference
 
 ---
 diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarSettingsFragment.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarSettingsFragment.java
+index 3c12eab..78dda27 100644
 --- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarSettingsFragment.java
 +++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/settings/AddressBarSettingsFragment.java
 @@ -5,6 +5,7 @@
@@ -13,7 +14,7 @@ diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/brow
  import android.content.res.Configuration;
  import android.os.Bundle;
  
-@@ -18,8 +19,10 @@
+@@ -18,8 +19,10 @@ import org.chromium.base.supplier.ObservableSuppliers;
  import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
  import org.chromium.build.annotations.NullMarked;
  import org.chromium.build.annotations.Nullable;
@@ -24,22 +25,22 @@ diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/brow
  import org.chromium.components.browser_ui.settings.SettingsUtils;
  import org.chromium.ui.base.DeviceFormFactor;
  
-@@ -39,6 +42,10 @@
-     @VisibleForTesting static final String PREF_ADDRESS_BAR_HEADER = "address_bar_header";
-     @VisibleForTesting static final String PREF_ADDRESS_BAR_PREFERENCE = "address_bar_preference";
+@@ -41,6 +44,11 @@ public class AddressBarSettingsFragment extends ChromeBaseSettingsFragment {
      @VisibleForTesting static final String PREF_ADDRESS_BAR_TITLE = "address_bar_title";
+     public static final String HIGHLIGHTED_OPTION = "AddressBarSettingsFragment.HighlightedOption";
+ 
 +    @VisibleForTesting
 +    static final String PREF_ADDRESS_BAR_ALWAYS_VISIBLE = "address_bar_always_visible";
 +    private static final String ACTION_ADDRESS_BAR_VISIBILITY_CHANGED =
 +            "com.kkhdwn.browser.ADDRESS_BAR_VISIBILITY_CHANGED";
-     public static final String HIGHLIGHTED_OPTION = "AddressBarSettingsFragment.HighlightedOption";
- 
++
      private final SettableMonotonicObservableSupplier<String> mPageTitle =
-@@ -55,6 +62,21 @@
+             ObservableSuppliers.createMonotonic();
+ 
+@@ -55,6 +63,20 @@ public class AddressBarSettingsFragment extends ChromeBaseSettingsFragment {
                  IntentUtils.safeGetInt(getArguments(), HIGHLIGHTED_OPTION, HighlightedOption.NONE);
          ((AddressBarPreference) findPreference(PREF_ADDRESS_BAR_PREFERENCE))
                  .init(highlightedOption);
-+
 +        ChromeSwitchPreference alwaysVisible =
 +                (ChromeSwitchPreference) findPreference(PREF_ADDRESS_BAR_ALWAYS_VISIBLE);
 +        alwaysVisible.setChecked(

@@ -1,11 +1,12 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-Subject: [PATCH] Add strings for the address bar visibility setting
+Subject: [PATCH] Add the address bar visibility strings
 
 ---
 diff --git a/chrome/browser/ui/android/toolbar/java/res/values/values.xml b/chrome/browser/ui/android/toolbar/java/res/values/values.xml
+index 75a2232..230516e 100644
 --- a/chrome/browser/ui/android/toolbar/java/res/values/values.xml
 +++ b/chrome/browser/ui/android/toolbar/java/res/values/values.xml
-@@ -13,4 +13,8 @@
+@@ -13,4 +13,8 @@ found in the LICENSE file.
      <integer name="window_controls_overlay_toggle_level_enable">0</integer>
      <integer name="window_controls_overlay_toggle_level_disable">1</integer>
  

@@ -1,11 +1,12 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-Subject: [PATCH] Keep the address bar visible when the user asks for it
+Subject: [PATCH] Refresh the controls lock when the address bar preference changes
 
 ---
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
+index adca551..d25591f 100644
 --- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
-@@ -7,12 +7,18 @@
+@@ -7,12 +7,18 @@ package org.chromium.chrome.browser.tab;
  import static org.chromium.build.NullUtil.assertNonNull;
  
  import android.annotation.SuppressLint;
@@ -18,14 +19,13 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
  import android.util.ArraySet;
  
  import androidx.annotation.IntDef;
--
 +import androidx.core.content.ContextCompat;
-+
+ 
 +import org.chromium.base.ContextUtils;
  import org.chromium.base.Log;
  import org.chromium.base.ResettersForTesting;
  import org.chromium.base.metrics.RecordHistogram;
-@@ -21,6 +27,7 @@
+@@ -21,6 +27,7 @@ import org.chromium.build.annotations.Nullable;
  import org.chromium.cc.input.BrowserControlsState;
  import org.chromium.chrome.browser.device.DeviceClassManager;
  import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -33,7 +33,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
  import org.chromium.ui.accessibility.AccessibilityState;
  import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
  import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
-@@ -35,6 +42,9 @@
+@@ -35,6 +42,9 @@ import org.chromium.url.GURL;
  
  import java.lang.annotation.Retention;
  import java.lang.annotation.RetentionPolicy;
@@ -43,11 +43,10 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
  import java.util.Set;
  
  /**
-@@ -49,6 +59,46 @@
+@@ -49,6 +59,45 @@ public class TabStateBrowserControlsVisibilityDelegate extends BrowserControlsVi
  
      /** The maximum amount of time to wait for a page to load before entering fullscreen. */
      private static final long MAX_FULLSCREEN_LOAD_DELAY_MS = 3000;
-+
 +    /** Mirrors the switch in AddressBarSettingsFragment. */
 +    private static final String PREF_ADDRESS_BAR_ALWAYS_VISIBLE = "address_bar_always_visible";
 +    private static final String ACTION_ADDRESS_BAR_VISIBILITY_CHANGED =
@@ -90,7 +89,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
  
      // These values are persisted to logs. Entries should not be renumbered and
      // numeric values should never be reused.
-@@ -61,6 +111,7 @@
+@@ -61,6 +110,7 @@ public class TabStateBrowserControlsVisibilityDelegate extends BrowserControlsVi
          LockReason.FULLSCREEN_LOADING,
          LockReason.A11Y_ENABLED,
          LockReason.FULLSCREEN_DISABLED,
@@ -98,19 +97,18 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
          LockReason.NUM_TOTAL
      })
      @Retention(RetentionPolicy.SOURCE)
-@@ -73,8 +124,9 @@
+@@ -73,8 +123,9 @@ public class TabStateBrowserControlsVisibilityDelegate extends BrowserControlsVi
          int FULLSCREEN_LOADING = 5;
          int A11Y_ENABLED = 6;
          int FULLSCREEN_DISABLED = 7;
--
--        int NUM_TOTAL = 8;
 +        int USER_PINNED_ADDRESS_BAR = 8;
-+
+ 
+-        int NUM_TOTAL = 8;
 +        int NUM_TOTAL = 9;
      }
  
      private static boolean sDisableLoadingCheck;
-@@ -95,6 +147,8 @@
+@@ -95,6 +146,8 @@ public class TabStateBrowserControlsVisibilityDelegate extends BrowserControlsVi
       */
      public TabStateBrowserControlsVisibilityDelegate(Tab tab) {
          mTab = (TabImpl) tab;

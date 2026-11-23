@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Apply the address bar visibility preference to the controls lock
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
+index 1532b6e..af780da 100644
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
+@@ -302,6 +302,11 @@ public class TabStateBrowserControlsVisibilityDelegate extends BrowserControlsVi
+             enableHidingBrowserControls = false;
+             flags |= (1 << (int) LockReason.A11Y_ENABLED);
+         }
++        if (ChromeSharedPreferences.getInstance()
++                .readBoolean(PREF_ADDRESS_BAR_ALWAYS_VISIBLE, false)) {
++            enableHidingBrowserControls = false;
++            flags |= (1 << (int) LockReason.USER_PINNED_ADDRESS_BAR);
++        }
+         if (!DeviceClassManager.enableFullscreen()) {
+             enableHidingBrowserControls = false;
+             flags |= (1 << (int) LockReason.FULLSCREEN_DISABLED);

@@ -1,11 +1,12 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-Subject: [PATCH] Add an address bar visibility setting
+Subject: [PATCH] Add an address bar always-visible switch
 
 ---
 diff --git a/chrome/browser/ui/android/toolbar/java/res/xml/address_bar_settings.xml b/chrome/browser/ui/android/toolbar/java/res/xml/address_bar_settings.xml
+index 6781f28..fc5e031 100644
 --- a/chrome/browser/ui/android/toolbar/java/res/xml/address_bar_settings.xml
 +++ b/chrome/browser/ui/android/toolbar/java/res/xml/address_bar_settings.xml
-@@ -20,6 +20,12 @@
+@@ -20,6 +20,12 @@ found in the LICENSE file.
          android:summary="@string/address_bar_settings_description" />
  
  
