@@ -1,0 +1,88 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Keep the address bar visible when the user asks for it
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
+@@ -21,6 +21,7 @@
+ import org.chromium.cc.input.BrowserControlsState;
+ import org.chromium.chrome.browser.device.DeviceClassManager;
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
++import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+ import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
+ import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
+ import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
+@@ -35,6 +36,9 @@
+ 
+ import java.lang.annotation.Retention;
+ import java.lang.annotation.RetentionPolicy;
++import java.lang.ref.WeakReference;
++import java.util.ArrayList;
++import java.util.List;
+ import java.util.Set;
+ 
+ /**
+@@ -49,6 +53,22 @@
+ 
+     /** The maximum amount of time to wait for a page to load before entering fullscreen. */
+     private static final long MAX_FULLSCREEN_LOAD_DELAY_MS = 3000;
++
++    /** Preference that keeps the address bar on screen regardless of scrolling. */
++    public static final String PREF_ADDRESS_BAR_ALWAYS_VISIBLE =
++            "Chrome.AddressBar.AlwaysVisible";
++
++    private static final List<WeakReference<TabStateBrowserControlsVisibilityDelegate>>
++            sInstances = new ArrayList<>();
++
++    /** Re-evaluates the controls constraints for every live tab. */
++    public static void refreshAll() {
++        for (WeakReference<TabStateBrowserControlsVisibilityDelegate> reference : sInstances) {
++            TabStateBrowserControlsVisibilityDelegate delegate = reference.get();
++            if (delegate != null) delegate.updateVisibilityConstraints();
++        }
++        sInstances.removeIf(reference -> reference.get() == null);
++    }
+ 
+     // These values are persisted to logs. Entries should not be renumbered and
+     // numeric values should never be reused.
+@@ -61,6 +81,7 @@
+         LockReason.FULLSCREEN_LOADING,
+         LockReason.A11Y_ENABLED,
+         LockReason.FULLSCREEN_DISABLED,
++        LockReason.USER_PINNED_ADDRESS_BAR,
+         LockReason.NUM_TOTAL
+     })
+     @Retention(RetentionPolicy.SOURCE)
+@@ -73,8 +94,9 @@
+         int FULLSCREEN_LOADING = 5;
+         int A11Y_ENABLED = 6;
+         int FULLSCREEN_DISABLED = 7;
+-
+-        int NUM_TOTAL = 8;
++        int USER_PINNED_ADDRESS_BAR = 8;
++
++        int NUM_TOTAL = 9;
+     }
+ 
+     private static boolean sDisableLoadingCheck;
+@@ -95,6 +117,7 @@
+      */
+     public TabStateBrowserControlsVisibilityDelegate(Tab tab) {
+         mTab = (TabImpl) tab;
++        sInstances.add(new WeakReference<>(this));
+         mTab.addObserver(
+                 new TabObserver() {
+                     @SuppressLint("HandlerLeak")
+@@ -305,6 +328,11 @@
+             enableHidingBrowserControls = false;
+             flags |= (1 << (int) LockReason.FULLSCREEN_DISABLED);
+         }
++        if (ChromeSharedPreferences.getInstance()
++                .readBoolean(PREF_ADDRESS_BAR_ALWAYS_VISIBLE, false)) {
++            enableHidingBrowserControls = false;
++            flags |= (1 << (int) LockReason.USER_PINNED_ADDRESS_BAR);
++        }
+ 
+         RecordHistogram.recordBooleanHistogram(
+                 "Android.BrowserControls.LockedByTabState", !enableHidingBrowserControls);

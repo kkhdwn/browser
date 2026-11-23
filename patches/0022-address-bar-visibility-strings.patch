@@ -1,0 +1,14 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Add strings for the address bar visibility setting
+
+---
+diff --git a/chrome/browser/ui/android/toolbar/java/res/values/browser_toolbar_strings.xml b/chrome/browser/ui/android/toolbar/java/res/values/browser_toolbar_strings.xml
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/android/toolbar/java/res/values/browser_toolbar_strings.xml
+@@ -0,0 +1,5 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="address_bar_always_visible_title">Keep the address bar visible</string>
++    <string name="address_bar_always_visible_summary">Do not hide the address bar while scrolling.</string>
++</resources>

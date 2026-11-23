@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Add an address bar visibility setting
+
+---
+diff --git a/chrome/browser/ui/android/toolbar/java/res/xml/address_bar_settings.xml b/chrome/browser/ui/android/toolbar/java/res/xml/address_bar_settings.xml
+--- a/chrome/browser/ui/android/toolbar/java/res/xml/address_bar_settings.xml
++++ b/chrome/browser/ui/android/toolbar/java/res/xml/address_bar_settings.xml
+@@ -20,6 +20,12 @@
+         android:summary="@string/address_bar_settings_description" />
+ 
+ 
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="address_bar_always_visible"
++        android:persistent="false"
++        android:summary="@string/address_bar_always_visible_summary"
++        android:title="@string/address_bar_always_visible_title" />
++
+     <org.chromium.chrome.browser.toolbar.settings.AddressBarPreference
+         android:key="address_bar_preference"
+         android:selectable="false"
