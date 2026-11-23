@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Show the launcher icons in the app icon settings
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java b/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
+@@ -29,6 +29,13 @@
+     private final SettableMonotonicObservableSupplier<String> mPageTitle =
+             ObservableSuppliers.createMonotonic();
+     private static final String[] STYLES = {"hitam", "biru", "hijau", "kuning", "merah"};
++    private static final int[] ICONS = {
++        org.chromium.chrome.R.mipmap.ic_launcher_hitam,
++        org.chromium.chrome.R.mipmap.ic_launcher_biru,
++        org.chromium.chrome.R.mipmap.ic_launcher_hijau,
++        org.chromium.chrome.R.mipmap.ic_launcher_kuning,
++        org.chromium.chrome.R.mipmap.ic_launcher_merah,
++    };
+     private static final int[] TITLES = {
+         org.chromium.chrome.R.string.app_icon_hitam,
+         org.chromium.chrome.R.string.app_icon_biru,
+@@ -48,6 +55,7 @@
+             ChromeBasePreference preference = new ChromeBasePreference(context);
+             preference.setKey(STYLES[i]);
+             preference.setTitle(context.getString(TITLES[i]));
++            preference.setIcon(ICONS[i]);
+             final int index = i;
+             preference.setOnPreferenceClickListener(
+                     (Preference clicked) -> {
