@@ -5,7 +5,27 @@ Subject: [PATCH] Keep the address bar visible when the user asks for it
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBrowserControlsVisibilityDelegate.java
-@@ -21,6 +21,7 @@
+@@ -7,12 +7,18 @@
+ import static org.chromium.build.NullUtil.assertNonNull;
+ 
+ import android.annotation.SuppressLint;
++import android.content.BroadcastReceiver;
++import android.content.Context;
++import android.content.Intent;
++import android.content.IntentFilter;
+ import android.os.Handler;
+ import android.os.Message;
+ import android.util.ArraySet;
+ 
+ import androidx.annotation.IntDef;
+-
++import androidx.core.content.ContextCompat;
++
++import org.chromium.base.ContextUtils;
+ import org.chromium.base.Log;
+ import org.chromium.base.ResettersForTesting;
+ import org.chromium.base.metrics.RecordHistogram;
+@@ -21,6 +27,7 @@
  import org.chromium.cc.input.BrowserControlsState;
  import org.chromium.chrome.browser.device.DeviceClassManager;
  import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -13,17 +33,28 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
  import org.chromium.ui.accessibility.AccessibilityState;
  import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
  import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
-@@ -50,6 +51,9 @@
+@@ -50,6 +57,20 @@
      /** The maximum amount of time to wait for a page to load before entering fullscreen. */
      private static final long MAX_FULLSCREEN_LOAD_DELAY_MS = 3000;
  
 +    /** Mirrors the switch in AddressBarSettingsFragment. */
 +    private static final String PREF_ADDRESS_BAR_ALWAYS_VISIBLE = "address_bar_always_visible";
++    private static final String ACTION_ADDRESS_BAR_VISIBILITY_CHANGED =
++            "com.kkhdwn.browser.ADDRESS_BAR_VISIBILITY_CHANGED";
++
++    private final BroadcastReceiver mVisibilityReceiver =
++            new BroadcastReceiver() {
++                @Override
++                public void onReceive(Context context, Intent intent) {
++                    updateVisibilityConstraints();
++                }
++            };
++    private boolean mVisibilityReceiverRegistered;
 +
      // These values are persisted to logs. Entries should not be renumbered and
      // numeric values should never be reused.
      @IntDef({
-@@ -61,6 +65,7 @@
+@@ -61,6 +82,7 @@
          LockReason.FULLSCREEN_LOADING,
          LockReason.A11Y_ENABLED,
          LockReason.FULLSCREEN_DISABLED,
@@ -31,7 +62,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
          LockReason.NUM_TOTAL
      })
      @Retention(RetentionPolicy.SOURCE)
-@@ -73,8 +78,9 @@
+@@ -73,8 +95,9 @@
          int FULLSCREEN_LOADING = 5;
          int A11Y_ENABLED = 6;
          int FULLSCREEN_DISABLED = 7;
@@ -43,3 +74,28 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabStateBro
      }
  
      private static boolean sDisableLoadingCheck;
+@@ -95,6 +118,12 @@
+      */
+     public TabStateBrowserControlsVisibilityDelegate(Tab tab) {
+         mTab = (TabImpl) tab;
++        ContextCompat.registerReceiver(
++                ContextUtils.getApplicationContext(),
++                mVisibilityReceiver,
++                new IntentFilter(ACTION_ADDRESS_BAR_VISIBILITY_CHANGED),
++                ContextCompat.RECEIVER_NOT_EXPORTED);
++        mVisibilityReceiverRegistered = true;
+         mTab.addObserver(
+                 new TabObserver() {
+                     @SuppressLint("HandlerLeak")
+@@ -240,6 +269,11 @@
+                     public void onDestroyed(Tab tab) {
+                         // Remove pending handler actions to prevent memory leaks.
+                         mHandler.removeCallbacksAndMessages(null);
++                        if (mVisibilityReceiverRegistered) {
++                            ContextUtils.getApplicationContext()
++                                    .unregisterReceiver(mVisibilityReceiver);
++                            mVisibilityReceiverRegistered = false;
++                        }
+                     }
+                 });
+         onWebContentsUpdated(mTab.getWebContents());
