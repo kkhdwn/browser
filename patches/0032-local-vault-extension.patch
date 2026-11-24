@@ -63,7 +63,7 @@ diff --git a/chrome/browser/resources/local_vault/content.js b/chrome/browser/re
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/resources/local_vault/content.js
-@@ -0,0 +1,705 @@
+@@ -0,0 +1,721 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -368,6 +368,16 @@ new file mode 100644
 +    const scrim = shadow && shadow.querySelector('.scrim');
 +    if (scrim) scrim.remove();
 +    mark('data-lv-sheet', 'closed');
++    // Closing the sheet must not take the keyboard away from the field the user
++    // was typing in.
++    if (activeField && document.contains(activeField)) {
++      try {
++        activeField.focus({preventScroll: true});
++      } catch (e) {
++        // Older engines ignore the options bag; focus() alone still keeps the IME.
++        activeField.focus();
++      }
++    }
 +  }
 +
 +  function openSheet(build) {
@@ -378,6 +388,7 @@ new file mode 100644
 +    build();
 +    closeSheet();
 +    const scrim = el('div', {className: 'scrim'});
++    scrim.addEventListener('mousedown', (event) => event.preventDefault());
 +    scrim.addEventListener('click', closeSheet);
 +    shadow.appendChild(scrim);
 +    sheet = el('div', {className: 'sheet'});
@@ -394,7 +405,12 @@ new file mode 100644
 +  }
 +
 +  function button(text, cls, onclick) {
-+    return el('button', {className: cls || '', textContent: text, onclick});
++    const node = el('button', {className: cls || '', textContent: text, onclick});
++    // Keep focus on the page field: without this, the button steals focus, the
++    // IME closes, and closing the sheet looks like it cancelled the login.
++    node.addEventListener('mousedown', (event) => event.preventDefault());
++    node.addEventListener('touchstart', (event) => event.preventDefault(), {passive: false});
++    return node;
 +  }
 +
 +  async function openAccounts() {
@@ -661,7 +677,7 @@ new file mode 100644
 +
 +  function openSaveSheet(pending) {
 +    openSheet((node) => {
-+      node.append(head('Simpan kata sandi?', HOST));
++      node.append(head('Simpan sandi?', HOST + ' \u00b7 ' + (pending.username || 'tanpa username')));
 +      const body = el('div', {className: 'body'});
 +      body.append(el('div', {className: 'row'},
 +          el('div', {className: 'avatar'},
@@ -670,11 +686,11 @@ new file mode 100644
 +              document.createTextNode(pending.username || '(tanpa username)'))));
 +      node.append(body);
 +      node.append(el('div', {className: 'actions'},
-+          button('Bukan sekarang', '', async () => {
++          button('Tidak', '', async () => {
 +            await storeSet({[PENDING_KEY]: null});
 +            closeSheet();
 +          }),
-+          button('Simpan', 'solid', () => savePending(pending))));
++          button('Ya', 'solid', () => savePending(pending))));
 +    });
 +  }
 +
