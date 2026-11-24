@@ -28,6 +28,15 @@ if [ "${KIND:-beta}" = "release" ] && [ "$ABI" = "arm64-v8a" ]; then
   ARGS+=(--latest)
 fi
 
-gh release create "$TAG" \
-  "$DIST"/*.apk "$DIST"/SHA256SUMS.txt "$DIST"/build-info.txt \
-  "${ARGS[@]}" 2>&1 | tee -a "$ROOT/build.log"
+# api.github.com occasionally times out from the runners; a failed publish must
+# not throw away an APK that already compiled and signed.
+for attempt in 1 2 3; do
+  if gh release create "$TAG" \
+      "$DIST"/*.apk "$DIST"/SHA256SUMS.txt "$DIST"/build-info.txt \
+      "${ARGS[@]}" 2>&1 | tee -a "$ROOT/build.log"; then
+    break
+  fi
+  echo "[release] publish attempt $attempt failed; retrying" | tee -a "$ROOT/build.log"
+  sleep $(( attempt * 30 ))
+  [ "$attempt" = "3" ] && exit 1
+done
