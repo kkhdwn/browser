@@ -251,17 +251,21 @@ fi
 if [ -x "$SRC/build/install-build-deps.sh" ]; then
   log "install-build-deps --android"
   ird_ok=0
-  for attempt in 1 2 3; do
-    if timeout 2700 sudo DEBIAN_FRONTEND=noninteractive \
+  for attempt in 1 2; do
+    if timeout 900 sudo DEBIAN_FRONTEND=noninteractive \
         "$SRC/build/install-build-deps.sh" --android --no-prompt; then
       ird_ok=1
       break
     fi
     log "install-build-deps failed (attempt $attempt); retrying"
     sudo apt-get -f install -y -qq "${APT_OPTS[@]}" >/dev/null 2>&1 || true
-    sleep $(( attempt * 60 ))
+    sleep $(( attempt * 30 ))
   done
-  [ "$ird_ok" = "1" ] || fail infra "install-build-deps"
+  if [ "$ird_ok" != "1" ]; then
+    # The runner image already carries the toolchain the APK needs; a failed
+    # dependency sweep must not cost the whole stage.
+    log "WARNING: install-build-deps did not complete; continuing with the runner toolchain"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
