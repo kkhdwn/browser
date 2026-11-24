@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Use the Android autofill provider even when it is Google
+
+---
+diff --git a/chrome/browser/autofill/android/java/src/org/chromium/chrome/browser/autofill/AutofillClientProviderUtils.java b/chrome/browser/autofill/android/java/src/org/chromium/chrome/browser/autofill/AutofillClientProviderUtils.java
+index ffa64d8..7104434 100644
+--- a/chrome/browser/autofill/android/java/src/org/chromium/chrome/browser/autofill/AutofillClientProviderUtils.java
++++ b/chrome/browser/autofill/android/java/src/org/chromium/chrome/browser/autofill/AutofillClientProviderUtils.java
+@@ -103,7 +103,13 @@ public class AutofillClientProviderUtils {
+             return AndroidAutofillAvailabilityStatus.UNKNOWN_ANDROID_AUTOFILL_SERVICE;
+         }
+         if (AWG_PACKAGE_NAME.equals(autofillServicePackage)) {
+-            return AndroidAutofillAvailabilityStatus.ANDROID_AUTOFILL_SERVICE_IS_GOOGLE;
++            // Unbranded builds ship without Google Password Manager, so refusing the provider
++            // Google ships would leave form filling with no backend at all. Android still routes
++            // the fill request to it, and nothing in Chrome's password store is touched.
++            prefs.setString(
++                    Pref.AUTOFILL_THIRD_PARTY_PACKAGE_USED_FOR_PLATFORM_AUTOFILL,
++                    autofillServicePackage);
++            return AndroidAutofillAvailabilityStatus.AVAILABLE;
+         }
+         // If the user explicitly chose the current Autofill Service before, use it again. The
+         // browser may default to built-in Autofill while the preferred provider is unavailable.
+@@ -157,9 +163,7 @@ public class AutofillClientProviderUtils {
+         if (autofillServicePackage == null) {
+             return; // No update possible.
+         }
+-        if (AWG_PACKAGE_NAME.equals(autofillServicePackage)) {
+-            return; // AWG can never be the preferred Autofill service.
+-        }
++
+         prefs.setString(
+                 Pref.AUTOFILL_THIRD_PARTY_PACKAGE_USED_FOR_PLATFORM_AUTOFILL,
+                 autofillServicePackage);

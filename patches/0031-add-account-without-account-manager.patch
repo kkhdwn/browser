@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Stop crashing when adding an account to the device
+
+---
+diff --git a/components/signin/public/android/java/src/org/chromium/components/signin/NullAccountManagerDelegate.java b/components/signin/public/android/java/src/org/chromium/components/signin/NullAccountManagerDelegate.java
+index fcf64ef..f503ac3 100644
+--- a/components/signin/public/android/java/src/org/chromium/components/signin/NullAccountManagerDelegate.java
++++ b/components/signin/public/android/java/src/org/chromium/components/signin/NullAccountManagerDelegate.java
+@@ -50,8 +50,9 @@ public class NullAccountManagerDelegate implements AccountManagerDelegate {
+     @Override
+     public void createAddAccountIntent(
+             @Nullable String prefilledEmail, Callback<@Nullable Intent> callback) {
+-        throw new UnsupportedOperationException(
+-                "NullAccountManagerDelegate does not implement createAddAccountIntent");
++        // Builds without the downstream account manager have nothing to launch. Reporting no intent
++        // lets the caller fall back instead of crashing the settings activity.
++        callback.onResult(null);
+     }
+ 
+     @Override
