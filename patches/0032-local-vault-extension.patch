@@ -63,14 +63,14 @@ diff --git a/chrome/browser/resources/local_vault/content.js b/chrome/browser/re
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/resources/local_vault/content.js
-@@ -0,0 +1,758 @@
+@@ -0,0 +1,701 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
 +
-+// Device-only password vault. A small key chip sits next to a login field and
-+// opens a sheet with the accounts saved for this origin, the option to save a
-+// submitted login, and a manager. Records live in chrome.storage.local
++// Device-only password vault. Tapping a login field opens a sheet with the
++// accounts saved for this origin, the option to save a submitted login, and a
++// manager. Records live in chrome.storage.local
 +// (app-private, never synced); with a PIN set every field is AES-GCM ciphertext
 +// under a PBKDF2 key, and the unlocked key only lives in chrome.storage.session
 +// (memory). No background worker, no network call anywhere in this file.
@@ -114,12 +114,10 @@ new file mode 100644
 +  }
 +  mark('data-local-vault', notes.length ? 'injected(' + notes.join(',') + ')' : 'injected');
 +  mark('data-lv-sheet', 'closed');
-+  mark('data-lv-chip', 'hidden');
 +
 +  let unlockedKey = null;
 +  let host = null;
 +  let shadow = null;
-+  let chip = null;
 +  let sheet = null;
 +  let activeField = null;
 +  let currentView = 'accounts';
@@ -274,56 +272,43 @@ new file mode 100644
 +
 +  const STYLE = `
 +    :host { all: initial; }
-+    .chip {
-+      position: fixed; width: 34px; height: 34px; border-radius: 17px;
-+      display: flex; align-items: center; justify-content: center;
-+      background: #202124; color: #8ab4f8; border: 1px solid #3c4043;
-+      font: 16px/1 Roboto, system-ui, sans-serif; pointer-events: auto;
-+      box-shadow: 0 2px 6px rgba(0,0,0,.45); cursor: pointer;
-+    }
-+    .badge {
-+      position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px;
-+      border-radius: 8px; background: #8ab4f8; color: #202124;
-+      font: 600 10px/16px Roboto, system-ui, sans-serif; text-align: center;
-+    }
 +    .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.45); pointer-events: auto; }
 +    .sheet {
 +      position: fixed; left: 0; right: 0; bottom: 0; pointer-events: auto;
 +      background: #292a2d; color: #e8eaed; border-radius: 16px 16px 0 0;
 +      box-shadow: 0 -2px 12px rgba(0,0,0,.5);
-+      font: 14px/20px Roboto, system-ui, sans-serif;
++      font: 15px/21px Roboto, system-ui, sans-serif;
 +      max-height: 70vh; display: flex; flex-direction: column;
 +    }
-+    .head { padding: 14px 16px 6px; }
-+    .title { font-size: 16px; font-weight: 500; }
-+    .sub { color: #9aa0a6; font-size: 12px; }
++    .head { padding: 16px 18px 8px; }
++    .title { font-size: 18px; font-weight: 500; }
++    .sub { color: #9aa0a6; font-size: 13px; margin-top: 2px; }
 +    .body { overflow-y: auto; padding: 0 8px 8px; }
 +    .row {
-+      display: flex; align-items: center; gap: 10px; padding: 12px 10px;
++      display: flex; align-items: center; gap: 12px; padding: 14px 12px;
 +      border-radius: 10px; cursor: pointer;
 +    }
 +    .row:hover { background: #35363a; }
 +    .row .who { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 +    .avatar {
-+      width: 30px; height: 30px; border-radius: 15px; background: #3c4043;
-+      color: #8ab4f8; font: 600 14px/30px Roboto, system-ui, sans-serif; text-align: center;
++      width: 34px; height: 34px; border-radius: 17px; background: #3c4043;
++      color: #8ab4f8; font: 600 15px/34px Roboto, system-ui, sans-serif; text-align: center;
 +    }
 +    button {
-+      all: unset; cursor: pointer; padding: 8px 12px; border-radius: 18px;
-+      font: 500 13px/18px Roboto, system-ui, sans-serif; color: #8ab4f8;
++      all: unset; cursor: pointer; padding: 9px 14px; border-radius: 18px;
++      font: 500 14px/20px Roboto, system-ui, sans-serif; color: #8ab4f8;
 +    }
 +    button.solid { background: #8ab4f8; color: #202124; }
 +    button.danger { color: #f28b82; }
 +    input {
 +      all: unset; background: #1f2023; color: #e8eaed; border-radius: 8px;
-+      padding: 9px 10px; font: 14px Roboto, system-ui, sans-serif; width: 100%;
++      padding: 10px 12px; font: 15px Roboto, system-ui, sans-serif; width: 100%;
 +      box-sizing: border-box; margin: 4px 0;
 +    }
-+    .field { padding: 4px 16px 8px; }
-+    .actions { display: flex; gap: 8px; justify-content: flex-end; padding: 4px 12px 12px; }
-+    .divider { height: 1px; background: #3c4043; margin: 8px 16px; }
-+    label.opt { display: flex; align-items: center; gap: 8px; padding: 8px 16px; cursor: pointer; }
-+    .hint { color: #9aa0a6; font-size: 11px; padding: 0 16px 8px; }
++    .field { padding: 4px 18px 8px; }
++    .actions { display: flex; gap: 8px; justify-content: flex-end; padding: 6px 14px 14px; }
++    .divider { height: 1px; background: #3c4043; margin: 8px 18px; }
++    .hint { color: #9aa0a6; font-size: 12px; padding: 0 18px 8px; }
 +  `;
 +
 +  function el(tag, props, ...children) {
@@ -354,16 +339,7 @@ new file mode 100644
 +    return Math.max(0, window.innerHeight - (vv.offsetTop + vv.height));
 +  }
 +
-+  function placeChip(field) {
-+    if (!chip || !field) return;
-+    const rect = field.getBoundingClientRect();
-+    const top = Math.min(Math.max(rect.top + (rect.height - 34) / 2, 4), window.innerHeight - 42);
-+    chip.style.top = top + 'px';
-+    chip.style.left = Math.max(rect.right - 42, 4) + 'px';
-+  }
-+
 +  function keepPosition() {
-+    if (activeField && chip && chip.style.display !== 'none') placeChip(activeField);
 +    if (sheet && sheet.parentNode) sheet.style.bottom = visualBottomInset() + 'px';
 +  }
 +
@@ -374,38 +350,12 @@ new file mode 100644
 +    window.visualViewport.addEventListener('scroll', keepPosition);
 +  }
 +
-+  // -------------------------------------------------------------------- chip
++  // ------------------------------------------------------------------- field
 +
-+  function showChip(field, count) {
-+    build();
-+    activeField = field || activeField;
-+    if (!chip) {
-+      chip = el('div', {className: 'chip'});
-+      chip.append(document.createTextNode('\u26BF'));
-+      chip.addEventListener('mousedown', (event) => {
-+        event.preventDefault();
-+        event.stopPropagation();
-+        openAccounts();
-+      }, true);
-+      chip.addEventListener('click', (event) => {
-+        event.preventDefault();
-+        event.stopPropagation();
-+      }, true);
-+      shadow.appendChild(chip);
-+    }
-+    const badge = chip.querySelector('.badge');
-+    if (badge) badge.remove();
-+    if (count > 0) {
-+      chip.append(el('span', {className: 'badge'}, document.createTextNode(String(count))));
-+    }
-+    if (activeField) placeChip(activeField);
-+    chip.style.display = 'flex';
-+    mark('data-lv-chip', 'shown');
-+  }
-+
-+  function hideChip() {
-+    if (chip) chip.style.display = 'none';
-+    mark('data-lv-chip', 'hidden');
++  async function openForField(field) {
++    if (!field || sheet) return;
++    activeField = field;
++    await openAccounts();
 +  }
 +
 +  // ------------------------------------------------------------------- sheet
@@ -703,8 +653,6 @@ new file mode 100644
 +    }
 +    await storeSet({[ITEMS_KEY]: items, [PENDING_KEY]: null});
 +    closeSheet();
-+    const list = await originItems();
-+    showChip(passwordFields(document)[0] || activeField, list.length);
 +  }
 +
 +  function openSaveSheet(pending) {
@@ -779,20 +727,19 @@ new file mode 100644
 +    }});
 +  }
 +
-+  document.addEventListener('focusin', async (event) => {
-+    const target = event.target;
-+    if (!target || target.type !== 'password') return;
-+    const list = await originItems();
-+    showChip(target, list.length);
-+  }, true);
++  function isLoginField(target) {
++    if (!target || !target.tagName || target.tagName.toLowerCase() !== 'input') return false;
++    const type = (target.getAttribute('type') || 'text').toLowerCase();
++    if (type !== 'password' && type !== 'text' && type !== 'email' && type !== 'tel') return false;
++    const form = target.closest('form');
++    if (form) return passwordFields(form).length > 0;
++    return passwordFields(document).length > 0;
++  }
 +
-+  document.addEventListener('focusout', () => {
-+    setTimeout(() => {
-+      const focused = document.activeElement;
-+      if (focused && focused.type === 'password') return;
-+      if (sheet) return;
-+      hideChip();
-+    }, 250);
++  document.addEventListener('focusin', (event) => {
++    const target = event.target;
++    if (!isLoginField(target)) return;
++    openForField(target);
 +  }, true);
 +
 +  document.addEventListener('submit', (event) => capture(event.target), true);
@@ -809,11 +756,7 @@ new file mode 100644
 +    if (pending && pending.origin === ORIGIN && Date.now() - pending.ts < PENDING_TTL) {
 +      await storeSet({[PENDING_KEY]: null});
 +      openSaveSheet(pending);
-+      return;
 +    }
-+    const list = await originItems();
-+    const field = passwordFields(document)[0];
-+    if (field && list.length) showChip(field, list.length);
 +  }
 +
 +  if (document.readyState === 'loading') {
