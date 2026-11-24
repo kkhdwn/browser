@@ -1,0 +1,71 @@
+diff --git a/chrome/android/java/res_base/values/values.xml b/chrome/android/java/res_base/values/values.xml
+index beaf714..89c1882 100644
+--- a/chrome/android/java/res_base/values/values.xml
++++ b/chrome/android/java/res_base/values/values.xml
+@@ -15,5 +15,5 @@ found in the LICENSE file.
+     <string name="app_icon_merah">Red</string>
+     <string name="app_icon_changed">Icon updated. It may take a moment for the launcher to refresh.</string>
+ 
+-    <color name="ic_launcher_background">#FFFFFFFF</color>
++    <color name="ic_launcher_background">#FF000000</color>
+ </resources>
+diff --git a/chrome/android/java/res_chromium_base/mipmap-hdpi/layered_app_icon_background.png b/chrome/android/java/res_chromium_base/mipmap-hdpi/layered_app_icon_background.png
+index 8538bed39259c15e6e0632c636b4a1430354080d..8fb2d25a023cab59cdcb41ace2a6e0dae35de224 100644
+GIT binary patch
+delta 68
+zcmaFQ^nq!Dik!Kpi(^Q|t+$s9c^Mcu4s7^o&THoJB9Qs?DmFd=#)*zA7zHLe<cs~;
+Y_9$4nys*Ik5Caf+y85}Sb4q9e0B*4utpET3
+
+literal 367
+zcmeAS@N?(olHy`uVBq!ia0vp^i$Iuz4M-mPBqq(kz-Z>_;uunK>+K~*UIqr9Lk53l
+zvq}5k^NN^uh;br=a+9E;l7t}1R8NQC!43&Q(kTwNBOM7YJ)}|wN^UI5NiJkiWOxo3
+b8b9-TU-#a;RQtdL7?2E}u6{1-oD!M<1iNG9
+
+diff --git a/chrome/android/java/res_chromium_base/mipmap-mdpi/layered_app_icon_background.png b/chrome/android/java/res_chromium_base/mipmap-mdpi/layered_app_icon_background.png
+index a92ccfafbb3168a16b5cd14f3133a4fcb2e56719..c45432f296f4b69993b93d6fc22cdf7bb0c2fc15 100644
+GIT binary patch
+delta 62
+zcmaFK_=<6YitI*D7srr_TW>EK@-i@R9N6&FoYzd@r6F_n)fb^^6CEatt!FK)NELZ_
+S_tIwuAn<hcb6Mw<&;$S%ju@B#
+
+delta 61
+zcmaFG_>ysgip&O27srr_TW>Ei@-i^+95VPbn@zg@l4nHlUM;bSj+4bUGBV^$iBYLP
+R@Rk7xJYD@<);T3K0RYvK7FhrQ
+
+diff --git a/chrome/android/java/res_chromium_base/mipmap-xhdpi/layered_app_icon_background.png b/chrome/android/java/res_chromium_base/mipmap-xhdpi/layered_app_icon_background.png
+index 3ba37c9e975d0d1dbd3e2e713756334c54fdd532..98d4959e31c35b8c8e8a022f9fc19de50580674f 100644
+GIT binary patch
+delta 90
+zcmV-g0Hy!@1O5Y$Bp<~|L_t(|+U?UZ4FCWLz_9r@4Jvp@j~ZCAssYZ30Fx{MAOcJT
+wlYjvfk-!U+Yyo<cuK@;=xd9B3?bsF{EeJD|T<-gnCIA2c07*qoM6N<$f)4K>r~m)}
+
+delta 78
+zcmeyz{D*mhirisO7srr_TW>EL@-i^+9NzFr{qCY0#y16&R9VltFikFCte9NKC^+%m
+eF9;<d_9K&5I<Wh!@v21(K;Y@>=d#Wzp$Py8As+Ss
+
+diff --git a/chrome/android/java/res_chromium_base/mipmap-xxhdpi/layered_app_icon_background.png b/chrome/android/java/res_chromium_base/mipmap-xxhdpi/layered_app_icon_background.png
+index 07f6de5a9bd4596ce0587731dbf65afc96a82f22..e3705035292360a634c9c72a97b59102885243c3 100644
+GIT binary patch
+delta 111
+zcmZo<Z)BffD8zAK!%uTwPCbvRD+l^Qc^TYUCKob=Pi$aeVquuf$QU|t0xOdP15|9X
+q0Mm}ip^ULit_V3)_0HlA|HWqR?Y-%DD=L@)2s~Z=T-G@yGywodJRw{F
+
+delta 92
+zcmZo<Z)BffD9Ceo!zcB-Ud@I#1&UNyAGk10W@HST*uc6uoKcjKk#X`vCYOl~l9R(3
+vcQ8$1nB2%{G<gD}G7z&)-puGG-oVdRv&_7H;oM)&3_#%N>gTe~DWM4fq(mNe
+
+diff --git a/chrome/android/java/res_chromium_base/mipmap-xxxhdpi/layered_app_icon_background.png b/chrome/android/java/res_chromium_base/mipmap-xxxhdpi/layered_app_icon_background.png
+index 5ae3008fea26d620e28d62b863faa171fb3fe8c4..81da07263ca143643743742094044710daafee53 100644
+GIT binary patch
+literal 1349
+zcmeAS@N?(olHy`uVBq!ia0y~yVB7%09Be?56MhC-3=FJ1o-U3d6}R4AHRNSr;5e}1
+zr#Y{dg-6wu1M@<88EjOT7}(e#sG*S&f)WxK;7CG(0fI180oCGG1vC-UIJj9r28MBP
+zvw#e^LJU<{E#+XKpItB)QQ3nGOn8Ev%67p63u|EF_uvc;QX>byd9c()<rIO}QiahZ
+iKN#{f{geEGrL4~%2X@E(l*<Pej|`r!elF{r5}E)Ic<#~w
+
+literal 1349
+zcmeAS@N?(olHy`uVBq!ia0y~yVB7%09Be?56MhC-3=FJ1o-U3d6}R4AHRNSr;5oeE
+zllt97Hw;g<O;Fcluo2;8Fff239v%h=VrFK5p#ujPAP7?xP%Um%K;;<5!Oa3PFpYzm
+z1vC_{5K|R4OQ~!e+|p4$kQVtvB_4d3=$AHWm6+(6HiwTNc9@2-x>=+a-rfc*9vM7c
+L{an^LB{Ts5FVyd%
+

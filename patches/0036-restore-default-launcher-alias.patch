@@ -1,0 +1,15 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Restore the default launcher alias category
+
+---
+diff --git a/chrome/android/java/AndroidManifest.xml b/chrome/android/java/AndroidManifest.xml
+--- a/chrome/android/java/AndroidManifest.xml
++++ b/chrome/android/java/AndroidManifest.xml
+@@ -732,6 +732,7 @@
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN" />
+                 <category android:name="android.intent.category.DEFAULT" />
++                <category android:name="android.intent.category.LAUNCHER" />
+                 <category android:name="android.intent.category.BROWSABLE" />
+                 <category android:name="android.intent.category.APP_BROWSER" />
+             </intent-filter>

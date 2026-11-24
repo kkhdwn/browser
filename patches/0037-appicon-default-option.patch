@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Add a default option to the app icon settings
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java b/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/appicon/AppIconSettingsFragment.java
+@@ -51,6 +51,17 @@
+         setPreferenceScreen(screen);
+         mPageTitle.set(context.getString(org.chromium.chrome.R.string.app_icon_settings));
+ 
++        ChromeBasePreference defaultPreference = new ChromeBasePreference(context);
++        defaultPreference.setKey("default");
++        defaultPreference.setTitle(context.getString(org.chromium.chrome.R.string.app_icon_default));
++        defaultPreference.setIcon(org.chromium.chrome.R.mipmap.app_icon);
++        defaultPreference.setOnPreferenceClickListener(
++                (Preference clicked) -> {
++                    applyDefault(context);
++                    return true;
++                });
++        screen.addPreference(defaultPreference);
++
+         for (int i = 0; i < STYLES.length; i++) {
+             ChromeBasePreference preference = new ChromeBasePreference(context);
+             preference.setKey(STYLES[i]);
+@@ -76,6 +87,22 @@
+         return AnimationType.PROPERTY;
+     }
+ 
++    private static void applyDefault(Context context) {
++        PackageManager packageManager = context.getPackageManager();
++        String packageName = context.getPackageName();
++        packageManager.setComponentEnabledSetting(
++                new ComponentName(packageName, "com.google.android.apps.chrome.Main"),
++                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
++                PackageManager.DONT_KILL_APP);
++        for (String style : STYLES) {
++            packageManager.setComponentEnabledSetting(
++                    new ComponentName(packageName, "com.google.android.apps.chrome.Main." + style),
++                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
++                    PackageManager.DONT_KILL_APP);
++        }
++        Toast.makeText(context, org.chromium.chrome.R.string.app_icon_changed, Toast.LENGTH_SHORT).show();
++    }
++
+     private static void applyStyle(Context context, int index) {
+         PackageManager packageManager = context.getPackageManager();
+         String packageName = context.getPackageName();

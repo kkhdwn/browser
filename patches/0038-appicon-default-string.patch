@@ -1,0 +1,15 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Add the default app icon label
+
+---
+diff --git a/chrome/android/java/res_base/values/values.xml b/chrome/android/java/res_base/values/values.xml
+--- a/chrome/android/java/res_base/values/values.xml
++++ b/chrome/android/java/res_base/values/values.xml
+@@ -8,6 +8,7 @@
+     <string translatable="false" name="manage_space_activity">org.chromium.chrome.browser.site_settings.ManageSpaceActivity</string>
+     <!-- App icon settings -->
+     <string name="app_icon_settings">App icon</string>
++    <string name="app_icon_default">Default</string>
+     <string name="app_icon_hitam">Black</string>
+     <string name="app_icon_biru">Blue</string>
+     <string name="app_icon_hijau">Green</string>
