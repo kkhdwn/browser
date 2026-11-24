@@ -1,0 +1,125 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] In-app brand marks follow the selected launcher icon
+
+---
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsMenuHelper.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsMenuHelper.java
+index a8ff4cb..ef788ba 100644
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsMenuHelper.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsMenuHelper.java
+@@ -8,6 +8,10 @@ import static org.chromium.build.NullUtil.assumeNonNull;
+ 
+ import android.annotation.SuppressLint;
+ import android.app.Activity;
++import android.content.ComponentName;
++import android.content.Context;
++import android.content.pm.PackageManager;
++import android.graphics.drawable.Drawable;
+ import android.text.TextUtils;
+ import android.view.Menu;
+ import android.view.MenuItem;
+@@ -17,6 +21,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
+ import android.widget.ImageButton;
+ import android.widget.ImageView;
+ 
++import androidx.appcompat.content.res.AppCompatResources;
+ import androidx.appcompat.widget.SearchView;
+ import androidx.appcompat.widget.Toolbar;
+ import androidx.core.view.AccessibilityDelegateCompat;
+@@ -251,6 +256,29 @@ public class SettingsMenuHelper {
+      * shown in a tab and showing the top-level main settings. A back button is shown in
+      * single-column layouts otherwise.
+      */
++    /**
++     * Resolves the icon of the launcher alias that is currently enabled, so the toolbar shows the
++     * same image as the home screen instead of the packaged default.
++     */
++    private static @Nullable Drawable launcherIcon(Context context) {
++        PackageManager packageManager = context.getPackageManager();
++        String packageName = context.getPackageName();
++        for (String style : new String[] {"dark", "color", "doodle"}) {
++            ComponentName alias =
++                    new ComponentName(packageName, "com.google.android.apps.chrome.Main." + style);
++            if (packageManager.getComponentEnabledSetting(alias)
++                    != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
++                continue;
++            }
++            try {
++                return packageManager.getActivityIcon(alias);
++            } catch (PackageManager.NameNotFoundException e) {
++                break;
++            }
++        }
++        return AppCompatResources.getDrawable(context, R.drawable.app_icon_32dp);
++    }
++
+     public static void updateNavigationIcon(
+             Toolbar toolbar,
+             Activity activity,
+@@ -260,8 +288,8 @@ public class SettingsMenuHelper {
+             boolean isMainSettings) {
+         if (show) {
+             if (isMultiColumn || (shownInTab && isMainSettings)) {
+-                // Show the Chrome logo at 32x32 dp without tinting.
+-                toolbar.setNavigationIcon(R.drawable.app_icon_32dp);
++                // Show the launcher icon of the active style, without tinting.
++                toolbar.setNavigationIcon(launcherIcon(activity));
+                 if (toolbar instanceof MaterialToolbar materialToolbar) {
+                     materialToolbar.clearNavigationIconTint();
+                 }
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedAppMenuPropertiesDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedAppMenuPropertiesDelegate.java
+index ea3d8e0..907e823 100644
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedAppMenuPropertiesDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedAppMenuPropertiesDelegate.java
+@@ -6,7 +6,9 @@ package org.chromium.chrome.browser.tabbed_mode;
+ 
+ import static org.chromium.build.NullUtil.assumeNonNull;
+ 
++import android.content.ComponentName;
+ import android.content.Context;
++import android.content.pm.PackageManager;
+ import android.content.res.Resources;
+ import android.graphics.drawable.Drawable;
+ import android.util.SparseArray;
+@@ -1549,10 +1551,8 @@ public class TabbedAppMenuPropertiesDelegate extends AppMenuPropertiesDelegateIm
+                         Resources.ID_NULL,
+                         isMenuIconAtStart());
+ 
+-        // Make the Chrome logo environment specific (Canary logo for Canary, etc.).
+-        model.set(
+-                AppMenuItemProperties.ICON,
+-                AppCompatResources.getDrawable(mContext, R.mipmap.app_icon));
++        // The row mirrors the launcher icon so it cannot drift from the chosen style.
++        model.set(AppMenuItemProperties.ICON, launcherIcon(mContext));
+ 
+         // Disable the grey default tint for this particular icon.
+         model.set(AppMenuItemProperties.ICON_NO_TINT, true);
+@@ -1560,6 +1560,29 @@ public class TabbedAppMenuPropertiesDelegate extends AppMenuPropertiesDelegateIm
+         return new ListItem(AppMenuHandler.AppMenuItemType.STANDARD, model);
+     }
+ 
++    /**
++     * Resolves the icon of the launcher alias that is currently enabled, so in-app surfaces show
++     * the same image as the home screen instead of the packaged default.
++     */
++    private static @Nullable Drawable launcherIcon(Context context) {
++        PackageManager packageManager = context.getPackageManager();
++        String packageName = context.getPackageName();
++        for (String style : new String[] {"dark", "color", "doodle"}) {
++            ComponentName alias =
++                    new ComponentName(packageName, "com.google.android.apps.chrome.Main." + style);
++            if (packageManager.getComponentEnabledSetting(alias)
++                    != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
++                continue;
++            }
++            try {
++                return packageManager.getActivityIcon(alias);
++            } catch (PackageManager.NameNotFoundException e) {
++                break;
++            }
++        }
++        return AppCompatResources.getDrawable(context, R.mipmap.ic_launcher_dark);
++    }
++
+     private @Nullable ListItem maybeBuildOpenGlicItem(@Nullable Tab currentTab) {
+         if (currentTab == null
+                 || currentTab.isIncognito()
