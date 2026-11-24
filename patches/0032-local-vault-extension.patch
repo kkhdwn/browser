@@ -63,7 +63,7 @@ diff --git a/chrome/browser/resources/local_vault/content.js b/chrome/browser/re
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/resources/local_vault/content.js
-@@ -0,0 +1,701 @@
+@@ -0,0 +1,705 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -467,18 +467,22 @@ new file mode 100644
 +      openPinSheet('Masukkan PIN', () => fillAccount(item));
 +      return;
 +    }
-+    const field = activeField && document.contains(activeField) ?
-+        activeField : passwordFields(document)[0];
-+    if (!field) {
++    // The tapped field may be the username box, so always resolve the password
++    // box first and use it as the anchor for the rest of the form.
++    let passwordField = activeField && activeField.type === 'password' ? activeField : null;
++    if (!passwordField || !document.contains(passwordField)) {
++      passwordField = passwordFields(document)[0] || null;
++    }
++    if (!passwordField) {
 +      closeSheet();
 +      return;
 +    }
 +    try {
 +      const user = await open(key, item.u);
 +      const pass = await open(key, item.p);
-+      const userField = usernameField(field.closest('form') || document, field);
++      const userField = usernameField(passwordField.closest('form') || document, passwordField);
 +      if (userField) setValue(userField, user);
-+      setValue(field, pass);
++      setValue(passwordField, pass);
 +    } catch (e) {
 +      openPinSheet('Masukkan PIN', () => fillAccount(item));
 +      return;
