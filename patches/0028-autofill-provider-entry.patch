@@ -34,7 +34,7 @@ index 0000000..726e4b1
 +</resources>
 \ No newline at end of file
 diff --git a/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java b/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
-index fb7b06d..f574bb7 100644
+index fb7b06d..3de8993 100644
 --- a/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
 +++ b/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
 @@ -6,7 +6,14 @@ package org.chromium.chrome.browser.password_manager.settings;
@@ -60,21 +60,7 @@ index fb7b06d..f574bb7 100644
  import org.chromium.base.ResettersForTesting;
  import org.chromium.build.annotations.NullMarked;
  import org.chromium.build.annotations.Nullable;
-@@ -41,6 +49,13 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
-     /** Constructor for inflating from XML. */
-     public PasswordsPreference(Context context, AttributeSet attrs) {
-         super(context, attrs);
-+        setOnPreferenceClickListener(
-+                (preference) -> {
-+                    if (PasswordManagerUtilBridge.isPasswordManagerAvailable()) return false;
-+                    Context current = getContext();
-+                    if (current != null) openAutofillProviderPicker(current);
-+                    return true;
-+                });
-     }
- 
-     /** For testing only. */
-@@ -63,6 +78,14 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
+@@ -63,6 +71,14 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
          PrefService prefService =
                  sPrefServiceForTesting != null ? sPrefServiceForTesting : UserPrefs.get(mProfile);
  
@@ -89,10 +75,25 @@ index fb7b06d..f574bb7 100644
          if (prefService.isManagedPreference(Pref.CREDENTIALS_ENABLE_SERVICE)) {
              setUpManagedDisclaimerView(holder, prefService);
          }
-@@ -71,6 +94,47 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
+@@ -71,6 +87,62 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
          setUpPostDeprecationWarning(holder);
      }
  
++    @Override
++    public boolean performClick() {
++        // The settings page installs its own click listener after inflation, so intercepting the
++        // click here is the only reliable hook. With no password manager backend the stock handler
++        // can only offer a Google Play services update, which ends nowhere on unbranded builds.
++        if (!PasswordManagerUtilBridge.isPasswordManagerAvailable()) {
++            Context context = getContext();
++            if (context != null) {
++                openAutofillProviderPicker(context);
++                return true;
++            }
++        }
++        return super.performClick();
++    }
++
 +    private void bindPlatformAutofillEntry(PreferenceViewHolder holder) {
 +        Context context = getContext();
 +        if (context == null) return;
