@@ -1,0 +1,114 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Point the autofill entry at the Android autofill provider
+
+---
+diff --git a/chrome/browser/password_manager/android/BUILD.gn b/chrome/browser/password_manager/android/BUILD.gn
+index bca44f6..b0c82a0 100644
+--- a/chrome/browser/password_manager/android/BUILD.gn
++++ b/chrome/browser/password_manager/android/BUILD.gn
+@@ -358,6 +358,7 @@ android_resources("java_resources") {
+     "java/res/layout/passwords_error_dialog.xml",
+     "java/res/layout/passwords_preference_error_widget.xml",
+     "java/res/layout/passwords_progress_dialog.xml",
++    "java/res/values/strings.xml",
+   ]
+   deps = [
+     "//chrome/browser/ui/android/strings:ui_strings_grd",
+diff --git a/chrome/browser/password_manager/android/java/res/values/strings.xml b/chrome/browser/password_manager/android/java/res/values/strings.xml
+new file mode 100644
+index 0000000..1d4fd0a
+--- /dev/null
++++ b/chrome/browser/password_manager/android/java/res/values/strings.xml
+@@ -0,0 +1,12 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++Copyright 2026 The Chromium Authors
++Use of this source code is governed by a BSD-style license that can be
++found in the LICENSE file.
++-->
++
++<resources>
++    <string name="autofill_provider_entry_title">Autofill service</string>
++    <string name="autofill_provider_entry_summary">Google Password Manager is not available in this build. Choose an autofill provider in Android settings to fill passwords and addresses.</string>
++    <string name="autofill_provider_entry_active">Autofill provider: %1$s. Restart the browser if filling does not work yet.</string>
++</resources>
+\ No newline at end of file
+diff --git a/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java b/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
+index fb7b06d..ae74909 100644
+--- a/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
++++ b/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
+@@ -7,6 +7,10 @@ package org.chromium.chrome.browser.password_manager.settings;
+ import static org.chromium.build.NullUtil.assumeNonNull;
+ 
+ import android.content.Context;
++import android.content.Intent;
++import android.net.Uri;
++import android.provider.Settings;
++import android.text.TextUtils;
+ import android.util.AttributeSet;
+ import android.view.View;
+ import android.widget.TextView;
+@@ -14,6 +18,7 @@ import android.widget.TextView;
+ import androidx.preference.PreferenceViewHolder;
+ 
+ import org.chromium.base.DeviceInfo;
++import org.chromium.base.IntentUtils;
+ import org.chromium.base.ResettersForTesting;
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+@@ -63,6 +68,14 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
+         PrefService prefService =
+                 sPrefServiceForTesting != null ? sPrefServiceForTesting : UserPrefs.get(mProfile);
+ 
++        // Without the Google Play Services password manager the stock entry opens a page that
++        // cannot do anything. Chrome still fills through the Android autofill framework, so the
++        // row points at the provider Android is configured with instead.
++        if (!PasswordManagerUtilBridge.isPasswordManagerAvailable()) {
++            bindPlatformAutofillEntry();
++            return;
++        }
++
+         if (prefService.isManagedPreference(Pref.CREDENTIALS_ENABLE_SERVICE)) {
+             setUpManagedDisclaimerView(holder, prefService);
+         }
+@@ -71,6 +84,40 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
+         setUpPostDeprecationWarning(holder);
+     }
+ 
++    private void bindPlatformAutofillEntry() {
++        Context context = getContext();
++        if (context == null) return;
++        String provider = platformAutofillProvider(context);
++        setTitle(R.string.autofill_provider_entry_title);
++        if (provider == null) {
++            setSummary(R.string.autofill_provider_entry_summary);
++        } else {
++            setSummary(context.getString(R.string.autofill_provider_entry_active, provider));
++        }
++        setOnPreferenceClickListener(
++                (preference) -> {
++                    openAutofillProviderPicker(context);
++                    return true;
++                });
++    }
++
++    private static @Nullable String platformAutofillProvider(Context context) {
++        String value = Settings.Secure.getString(context.getContentResolver(), "autofill_service");
++        if (TextUtils.isEmpty(value)) return null;
++        int separator = value.indexOf('/');
++        String packageName = separator < 0 ? value : value.substring(0, separator);
++        if (packageName.isEmpty() || "com.google.android.gms".equals(packageName)) return null;
++        return packageName;
++    }
++
++    private static void openAutofillProviderPicker(Context context) {
++        Intent intent = new Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE);
++        // A package that is not an autofill service forces the system to always show the picker.
++        intent.setData(Uri.parse("package:org.chromium.chrome.autofill_picker"));
++        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++        IntentUtils.safeStartActivity(context, intent);
++    }
++
+     private void setUpManagedDisclaimerView(PreferenceViewHolder holder, PrefService prefService) {
+         TextViewWithCompoundDrawables managedDisclaimerView =
+                 holder.itemView.findViewById(R.id.managed_disclaimer_text);
