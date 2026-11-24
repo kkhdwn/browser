@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Drop the app icon picker from settings
+
+---
+diff --git a/chrome/android/java/res/xml/main_preferences.xml b/chrome/android/java/res/xml/main_preferences.xml
+index 2277a0c..67228cb 100644
+--- a/chrome/android/java/res/xml/main_preferences.xml
++++ b/chrome/android/java/res/xml/main_preferences.xml
+@@ -40,11 +40,6 @@ found in the LICENSE file.
+         android:key="address_bar"
+         android:order="7"
+         android:title="@string/address_bar_settings"/>
+-    <org.chromium.components.browser_ui.settings.ChromeBasePreference
+-        android:fragment="org.chromium.chrome.browser.appicon.AppIconSettingsFragment"
+-        android:key="app_icon"
+-        android:order="70"
+-        android:title="@string/app_icon_settings"/>
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.chrome.browser.privacy.settings.PrivacySettings"
+         android:key="privacy"
