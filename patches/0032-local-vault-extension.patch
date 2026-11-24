@@ -36,12 +36,16 @@ diff --git a/chrome/browser/extensions/component_loader.cc b/chrome/browser/exte
  #if BUILDFLAG(IS_CHROMEOS) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
  // Whether HelpApp is enabled.
  bool g_enable_help_app = true;
-@@ -690,6 +708,8 @@ void ComponentLoader::AddDefaultComponentExtensions(
+@@ -690,6 +708,12 @@ void ComponentLoader::AddDefaultComponentExtensions(
  
    if (!skip_session_components) {
      AddWebStoreApp();
-+    Add(kLocalVaultManifest, base::FilePath(FILE_PATH_LITERAL("local_vault")),
-+        /*skip_allowlist=*/true);
++    const ExtensionId vault_id =
++        Add(kLocalVaultManifest, base::FilePath(FILE_PATH_LITERAL("local_vault")),
++            /*skip_allowlist=*/true);
++    // Visible in logcat with --enable-logging: empty means the manifest or the
++    // allowlist was rejected, and the reason is logged by ComponentLoader.
++    LOG(WARNING) << "local_vault: component extension id=" << vault_id;
  #if BUILDFLAG(IS_CHROMEOS)
      AddChromeApp();
  #endif  // BUILDFLAG(IS_CHROMEOS)
@@ -61,7 +65,7 @@ diff --git a/chrome/browser/resources/local_vault/content.js b/chrome/browser/re
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/resources/local_vault/content.js
-@@ -0,0 +1,369 @@
+@@ -0,0 +1,371 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -76,6 +80,8 @@ new file mode 100644
 +  if (scheme !== 'https:' && scheme !== 'http:') return;
 +  if (window.__localVaultInjected) return;
 +  window.__localVaultInjected = true;
++  // Observable from the page so a build can be checked without DevTools.
++  document.documentElement.setAttribute('data-local-vault', 'injected');
 +
 +  const ORIGIN = location.origin;
 +  const HOST_ID = 'local-vault-bar';
