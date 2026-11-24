@@ -34,7 +34,7 @@ index 0000000..1d4fd0a
 +</resources>
 \ No newline at end of file
 diff --git a/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java b/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
-index fb7b06d..ae74909 100644
+index fb7b06d..01ea8a4 100644
 --- a/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
 +++ b/chrome/browser/password_manager/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordsPreference.java
 @@ -7,6 +7,10 @@ package org.chromium.chrome.browser.password_manager.settings;
@@ -56,7 +56,21 @@ index fb7b06d..ae74909 100644
  import org.chromium.base.ResettersForTesting;
  import org.chromium.build.annotations.NullMarked;
  import org.chromium.build.annotations.Nullable;
-@@ -63,6 +68,14 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
+@@ -41,6 +46,13 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
+     /** Constructor for inflating from XML. */
+     public PasswordsPreference(Context context, AttributeSet attrs) {
+         super(context, attrs);
++        setOnPreferenceClickListener(
++                (preference) -> {
++                    if (PasswordManagerUtilBridge.isPasswordManagerAvailable()) return false;
++                    Context current = getContext();
++                    if (current != null) openAutofillProviderPicker(current);
++                    return true;
++                });
+     }
+ 
+     /** For testing only. */
+@@ -63,6 +75,14 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
          PrefService prefService =
                  sPrefServiceForTesting != null ? sPrefServiceForTesting : UserPrefs.get(mProfile);
  
@@ -64,32 +78,32 @@ index fb7b06d..ae74909 100644
 +        // cannot do anything. Chrome still fills through the Android autofill framework, so the
 +        // row points at the provider Android is configured with instead.
 +        if (!PasswordManagerUtilBridge.isPasswordManagerAvailable()) {
-+            bindPlatformAutofillEntry();
++            bindPlatformAutofillEntry(holder);
 +            return;
 +        }
 +
          if (prefService.isManagedPreference(Pref.CREDENTIALS_ENABLE_SERVICE)) {
              setUpManagedDisclaimerView(holder, prefService);
          }
-@@ -71,6 +84,40 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
+@@ -71,6 +91,40 @@ public class PasswordsPreference extends ChromeBasePreference implements Profile
          setUpPostDeprecationWarning(holder);
      }
  
-+    private void bindPlatformAutofillEntry() {
++    private void bindPlatformAutofillEntry(PreferenceViewHolder holder) {
 +        Context context = getContext();
 +        if (context == null) return;
++        // Preference setters notify the adapter, which throws while the RecyclerView is laying
++        // out. The stock implementation writes to the row views for the same reason.
++        TextView titleView = (TextView) holder.findViewById(android.R.id.title);
++        if (titleView != null) titleView.setText(R.string.autofill_provider_entry_title);
++        TextView summaryView = (TextView) holder.findViewById(android.R.id.summary);
++        if (summaryView == null) return;
 +        String provider = platformAutofillProvider(context);
-+        setTitle(R.string.autofill_provider_entry_title);
-+        if (provider == null) {
-+            setSummary(R.string.autofill_provider_entry_summary);
-+        } else {
-+            setSummary(context.getString(R.string.autofill_provider_entry_active, provider));
-+        }
-+        setOnPreferenceClickListener(
-+                (preference) -> {
-+                    openAutofillProviderPicker(context);
-+                    return true;
-+                });
++        summaryView.setText(
++                provider == null
++                        ? context.getString(R.string.autofill_provider_entry_summary)
++                        : context.getString(R.string.autofill_provider_entry_active, provider));
++        summaryView.setVisibility(View.VISIBLE);
 +    }
 +
 +    private static @Nullable String platformAutofillProvider(Context context) {
