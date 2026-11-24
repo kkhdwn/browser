@@ -275,6 +275,16 @@ if [ "$HAVE" != "$WANT" ]; then
   git checkout -f -- . || fail patch "git checkout -- ."
   git clean -fdq || true
   bash "$ROOT/apply.sh" "$SRC" || fail patch "patch series does not apply"
+  # One prepared image for every launcher and application icon. Only files that
+  # already exist are replaced, so the resource set stays exactly as declared.
+  if [ -d "$ROOT/assets/icons" ]; then
+    log "overlaying project icons"
+    ( cd "$ROOT/assets/icons" && find . -type f -name '*.png' -print0 |
+        while IFS= read -r -d '' icon; do
+          dest="$SRC/${icon#./}"
+          [ -f "$dest" ] && cp "$icon" "$dest"
+        done )
+  fi
   printf '%s' "$WANT" > "$STATE"
 else
   log "patches already applied for this version"
