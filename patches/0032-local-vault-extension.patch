@@ -11,7 +11,7 @@ AES-GCM under a PBKDF2 key derived from the PIN.
 diff --git a/chrome/browser/extensions/component_loader.cc b/chrome/browser/extensions/component_loader.cc
 --- a/chrome/browser/extensions/component_loader.cc
 +++ b/chrome/browser/extensions/component_loader.cc
-@@ -110,6 +110,24 @@ BASE_FEATURE(kRemoveHangoutsExtension, base::FEATURE_DISABLED_BY_DEFAULT);
+@@ -110,6 +110,23 @@ BASE_FEATURE(kRemoveHangoutsExtension, base::FEATURE_DISABLED_BY_DEFAULT);
  
  bool g_enable_background_extensions_during_testing = false;
  
@@ -25,7 +25,6 @@ diff --git a/chrome/browser/extensions/component_loader.cc b/chrome/browser/exte
 +  "description": "Saves passwords on this device only. Nothing is synced.",
 +  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAubno6itneFww/pKP73DiQYn65SQVHw/qEY/OJdOy7l2ss1bLZ5pbkaF29PNRdMxaIE4EMMPkpMTV99x6P2M+CrWkdee6Ub0W6z60aaMvaTWaI3r5jsSVs2WDn3YexGEyVwtxtm0t5xtTlCbdK7rIqDbomMvYcN4Fr8hqPgvcnBXluOEv4W2723eLWOgXIZao3c9k+t6/w59H+Ub1p6f12zbs74TB6Gt/BOP+pqO3KPHQgxzLi/HXbyc9AXt7x/sRAHkdTKAUhYIJWELOVZa88kKJrQFIK6euYrVw+rHw8kR/isnDiX4+/rkzFcqraY3oMsAa4qH4SGmgLrlpOACUeQIDAQAB",
 +  "permissions": ["storage"],
-+  "background": {"service_worker": "worker.js"},
 +  "content_scripts": [{
 +    "matches": ["<all_urls>"],
 +    "js": ["content.js"],
@@ -36,7 +35,7 @@ diff --git a/chrome/browser/extensions/component_loader.cc b/chrome/browser/exte
  #if BUILDFLAG(IS_CHROMEOS) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
  // Whether HelpApp is enabled.
  bool g_enable_help_app = true;
-@@ -690,6 +708,12 @@ void ComponentLoader::AddDefaultComponentExtensions(
+@@ -690,6 +707,12 @@ void ComponentLoader::AddDefaultComponentExtensions(
  
    if (!skip_session_components) {
      AddWebStoreApp();
@@ -52,12 +51,11 @@ diff --git a/chrome/browser/extensions/component_loader.cc b/chrome/browser/exte
 diff --git a/chrome/browser/resources/component_extension_resources.grd b/chrome/browser/resources/component_extension_resources.grd
 --- a/chrome/browser/resources/component_extension_resources.grd
 +++ b/chrome/browser/resources/component_extension_resources.grd
-@@ -12,6 +12,8 @@
+@@ -12,6 +12,7 @@
    </outputs>
    <release seq="1">
      <includes>
 +      <include name="IDR_LOCAL_VAULT_CONTENT_JS" file="local_vault/content.js" type="BINDATA" />
-+      <include name="IDR_LOCAL_VAULT_WORKER_JS" file="local_vault/worker.js" type="BINDATA" />
        <include name="IDR_NETWORK_SPEECH_SYNTHESIS_JS" file="network_speech_synthesis/tts_extension.js" type="BINDATA" />
  
        <include name="IDR_NETWORK_SPEECH_SYNTHESIS_MV3_AUDIO_HTML" file="network_speech_synthesis/mv3/audio.html" type="BINDATA" />
@@ -65,14 +63,16 @@ diff --git a/chrome/browser/resources/local_vault/content.js b/chrome/browser/re
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/resources/local_vault/content.js
-@@ -0,0 +1,371 @@
+@@ -0,0 +1,589 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
 +
-+// Device-only password vault: the page half. Renders a thin bar pinned to the
-+// top of the viewport, captures submitted logins and fills stored ones. All
-+// storage and crypto live in worker.js; this file never persists anything.
++// Device-only password vault. Everything lives in this content script: the
++// records are in chrome.storage.local (app-private, never synced), the PIN key
++// is derived with WebCrypto and kept in chrome.storage.session (memory only),
++// and the UI is a thin bar pinned under the toolbar. There is no background
++// worker and no network call anywhere in this file.
 +
 +(() => {
 +  if (window.top !== window) return;
@@ -80,24 +80,91 @@ new file mode 100644
 +  if (scheme !== 'https:' && scheme !== 'http:') return;
 +  if (window.__localVaultInjected) return;
 +  window.__localVaultInjected = true;
-+  // Observable from the page so a build can be checked without DevTools.
-+  document.documentElement.setAttribute('data-local-vault', 'injected');
 +
 +  const ORIGIN = location.origin;
-+  const HOST_ID = 'local-vault-bar';
 +  const PENDING_TTL = 120000;
++  const ITERATIONS = 210000;
++  const PROBE = 'local-vault-probe-v1';
++  const MIN_PIN = 4;
++  const SETTINGS_KEY = 'lv_settings';
++  const ITEMS_KEY = 'lv_items';
++  const PENDING_KEY = 'lv_pending';
++  const KEY_STORAGE = 'lv_key';
 +
++  const notes = [];
++  const hasStorage = !!(chrome && chrome.storage && chrome.storage.local);
++  const hasSession = !!(chrome && chrome.storage && chrome.storage.session);
++  const hasSubtle = !!(window.crypto && window.crypto.subtle);
++  if (!hasStorage) notes.push('storage=missing');
++  if (!hasSession) notes.push('session=missing');
++  if (!hasSubtle) notes.push('subtle=missing');
++  try {
++    if (hasSession && chrome.storage.session.setAccessLevel) {
++      chrome.storage.session.setAccessLevel({accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS'});
++    }
++  } catch (e) {
++    notes.push('session-level=failed');
++  }
++  document.documentElement.setAttribute(
++      'data-local-vault', notes.length ? 'injected(' + notes.join(',') + ')' : 'injected');
++
++  let unlockedKey = null;
 +  let host = null;
 +  let shadow = null;
 +  let root = null;
-+  let state = 'hidden';
 +
-+  function send(message) {
++  const encoder = new TextEncoder();
++  const decoder = new TextDecoder();
++
++  function toBase64(bytes) {
++    let binary = '';
++    const view = new Uint8Array(bytes);
++    for (let i = 0; i < view.length; i++) binary += String.fromCharCode(view[i]);
++    return btoa(binary);
++  }
++
++  function fromBase64(text) {
++    const binary = atob(text);
++    const bytes = new Uint8Array(binary.length);
++    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
++    return bytes;
++  }
++
++  async function storeGet(keys) {
++    if (!hasStorage) return {};
 +    return new Promise((resolve) => {
 +      try {
-+        chrome.runtime.sendMessage(message, (reply) => {
++        chrome.storage.local.get(keys, (values) => {
 +          void chrome.runtime.lastError;
-+          resolve(reply || null);
++          resolve(values || {});
++        });
++      } catch (e) {
++        resolve({});
++      }
++    });
++  }
++
++  async function storeSet(values) {
++    if (!hasStorage) return false;
++    return new Promise((resolve) => {
++      try {
++        chrome.storage.local.set(values, () => {
++          void chrome.runtime.lastError;
++          resolve(true);
++        });
++      } catch (e) {
++        resolve(false);
++      }
++    });
++  }
++
++  async function sessionGet(key) {
++    if (!hasSession) return null;
++    return new Promise((resolve) => {
++      try {
++        chrome.storage.session.get(key, (values) => {
++          void chrome.runtime.lastError;
++          resolve((values || {})[key] || null);
 +        });
 +      } catch (e) {
 +        resolve(null);
@@ -105,12 +172,107 @@ new file mode 100644
 +    });
 +  }
 +
++  async function sessionSet(key, value) {
++    if (!hasSession) return;
++    return new Promise((resolve) => {
++      try {
++        if (value === null) {
++          chrome.storage.session.remove(key, () => {
++            void chrome.runtime.lastError;
++            resolve();
++          });
++        } else {
++          chrome.storage.session.set({[key]: value}, () => {
++            void chrome.runtime.lastError;
++            resolve();
++          });
++        }
++      } catch (e) {
++        resolve();
++      }
++    });
++  }
++
++  async function settings() {
++    const stored = await storeGet(SETTINGS_KEY);
++    return stored[SETTINGS_KEY] || {mode: 'none'};
++  }
++
++  async function items() {
++    const stored = await storeGet(ITEMS_KEY);
++    return stored[ITEMS_KEY] || [];
++  }
++
++  async function deriveKey(pin, salt) {
++    const material = await crypto.subtle.importKey(
++        'raw', encoder.encode(pin), 'PBKDF2', false, ['deriveKey']);
++    return crypto.subtle.deriveKey(
++        {
++          name: 'PBKDF2',
++          salt: fromBase64(salt),
++          iterations: ITERATIONS,
++          hash: 'SHA-256',
++        },
++        material,
++        {name: 'AES-GCM', length: 256},
++        true,
++        ['encrypt', 'decrypt']);
++  }
++
++  async function seal(key, text) {
++    if (!key) return {iv: '', ct: toBase64(encoder.encode(text))};
++    if (!hasSubtle) throw new Error('no-subtle');
++    const iv = crypto.getRandomValues(new Uint8Array(12));
++    const cipher = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, key, encoder.encode(text));
++    return {iv: toBase64(iv), ct: toBase64(cipher)};
++  }
++
++  async function open(key, blob) {
++    if (!blob) return '';
++    if (!blob.iv) return decoder.decode(fromBase64(blob.ct));
++    if (!hasSubtle) throw new Error('no-subtle');
++    const plain = await crypto.subtle.decrypt(
++        {name: 'AES-GCM', iv: fromBase64(blob.iv)}, key, fromBase64(blob.ct));
++    return decoder.decode(plain);
++  }
++
++  async function restoreKey() {
++    const config = await settings();
++    if (config.mode !== 'pin') {
++      unlockedKey = null;
++      return null;
++    }
++    if (unlockedKey) return unlockedKey;
++    const raw = await sessionGet(KEY_STORAGE);
++    if (!raw) return null;
++    try {
++      unlockedKey = await crypto.subtle.importKey(
++          'raw', fromBase64(raw), {name: 'AES-GCM'}, true, ['encrypt', 'decrypt']);
++    } catch (e) {
++      unlockedKey = null;
++    }
++    return unlockedKey;
++  }
++
++  async function unlock(config, pin) {
++    if (!pin || !config.salt || !hasSubtle) return false;
++    const key = await deriveKey(pin, config.salt);
++    try {
++      if (await open(key, config.probe) !== PROBE) return false;
++    } catch (e) {
++      return false;
++    }
++    unlockedKey = key;
++    await sessionSet(KEY_STORAGE, toBase64(await crypto.subtle.exportKey('raw', key)));
++    return true;
++  }
++
 +  const STYLE = `
 +    :host { all: initial; }
 +    .bar {
 +      position: fixed; top: 0; left: 0; right: 0;
-+      display: flex; align-items: center; gap: 8px;
-+      min-height: 40px; padding: 0 12px;
++      display: flex; align-items: center; gap: 6px;
++      min-height: 40px; padding: 0 10px;
 +      box-sizing: border-box;
 +      background: #292a2d; color: #e8eaed;
 +      font: 13px/18px Roboto, system-ui, sans-serif;
@@ -127,11 +289,10 @@ new file mode 100644
 +    button.icon { padding: 6px 8px; color: #9aa0a6; }
 +    input {
 +      all: unset; background: #1f2023; color: #e8eaed; border-radius: 6px;
-+      padding: 5px 8px; width: 120px; font: 13px Roboto, system-ui, sans-serif;
++      padding: 5px 8px; width: 110px; font: 13px Roboto, system-ui, sans-serif;
 +    }
 +    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-+    .list { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; }
-+    .settings { background: #292a2d; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
++    .settings { background: #292a2d; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 +    label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 +    .hint { color: #9aa0a6; font-size: 11px; }
 +  `;
@@ -139,9 +300,8 @@ new file mode 100644
 +  function build() {
 +    if (host) return;
 +    host = document.createElement('div');
-+    host.id = HOST_ID;
-+    host.style.cssText =
-+        'position:fixed;top:0;left:0;right:0;z-index:2147483647;';
++    host.id = 'local-vault-bar';
++    host.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;';
 +    shadow = host.attachShadow({mode: 'open'});
 +    const style = document.createElement('style');
 +    style.textContent = STYLE;
@@ -151,27 +311,11 @@ new file mode 100644
 +    (document.body || document.documentElement).appendChild(host);
 +  }
 +
-+  function clear() {
-+    while (root.firstChild) root.removeChild(root.firstChild);
-+  }
-+
 +  function el(tag, props, ...children) {
 +    const node = document.createElement(tag);
 +    Object.assign(node, props || {});
-+    for (const child of children) {
-+      node.append(child);
-+    }
++    for (const child of children) node.append(child);
 +    return node;
-+  }
-+
-+  function hide() {
-+    state = 'hidden';
-+    if (host) host.style.display = 'none';
-+  }
-+
-+  function show() {
-+    build();
-+    host.style.display = 'block';
 +  }
 +
 +  function label(main, sub) {
@@ -181,124 +325,69 @@ new file mode 100644
 +    return wrap;
 +  }
 +
-+  function renderBar(children) {
-+    clear();
++  function hide() {
++    if (host) host.style.display = 'none';
++  }
++
++  function show(children) {
++    build();
++    while (root.firstChild) root.removeChild(root.firstChild);
 +    const bar = el('div', {className: 'bar'});
 +    for (const child of children) bar.append(child);
 +    root.append(bar);
-+    show();
-+  }
-+
-+  function renderSettings(settings) {
-+    clear();
-+    const bar = el('div', {className: 'bar'});
-+    bar.append(label('Local vault', 'Device-only password storage'));
-+    bar.append(el('button', {
-+      className: 'icon',
-+      textContent: '\u2715',
-+      onclick: () => hide(),
-+    }));
-+    root.append(bar);
-+    const panel = el('div', {className: 'settings'});
-+    const none = el('input', {type: 'radio', name: 'lv-mode', value: 'none'});
-+    none.checked = settings.mode === 'none';
-+    const pin = el('input', {type: 'radio', name: 'lv-mode', value: 'pin'});
-+    pin.checked = settings.mode === 'pin';
-+    panel.append(el('label', {}, none, document.createTextNode('Open without a PIN')));
-+    panel.append(el('label', {}, pin, document.createTextNode('Lock with a PIN')));
-+    const pinInput = el('input', {type: 'password', placeholder: 'PIN', maxLength: 32});
-+    const pinInput2 = el('input', {type: 'password', placeholder: 'Repeat PIN', maxLength: 32});
-+    panel.append(el('div', {className: 'row'}, pinInput, pinInput2));
-+    panel.append(el('div', {className: 'hint'},
-+        document.createTextNode('PIN is never stored. It derives the key that encrypts the vault.')));
-+    const status = el('div', {className: 'hint'});
-+    const save = el('button', {className: 'solid', textContent: 'Save settings'});
-+    save.onclick = async () => {
-+      const mode = pin.checked ? 'pin' : 'none';
-+      const next = pinInput.value;
-+      if (mode === 'pin' && next.length < 4) {
-+        status.textContent = 'PIN must be at least 4 characters.';
-+        return;
-+      }
-+      if (mode === 'pin' && next !== pinInput2.value) {
-+        status.textContent = 'PINs do not match.';
-+        return;
-+      }
-+      const reply = await send({type: 'setMode', mode, pin: next});
-+      if (reply && reply.ok) {
-+        hide();
-+        return;
-+      }
-+      status.textContent = reply && reply.error === 'pin' ? 'Wrong current PIN.' : 'Could not change the lock.';
-+    };
-+    panel.append(el('div', {className: 'row'}, save, status));
-+    root.append(panel);
-+    show();
++    host.style.display = 'block';
 +  }
 +
 +  function pinPrompt(intro, onSubmit) {
-+    clear();
-+    const form = el('div', {className: 'bar'});
-+    form.append(label(intro, 'Local vault is locked'));
 +    const input = el('input', {type: 'password', placeholder: 'PIN', maxLength: 32});
-+    const go = el('button', {className: 'solid', textContent: 'Unlock'});
-+    const cancel = el('button', {textContent: 'Cancel', onclick: () => hide()});
 +    const error = el('span', {className: 'sub'});
 +    const submit = async () => {
-+      const reply = await send({type: 'unlock', pin: input.value});
-+      if (reply && reply.ok) {
++      const config = await settings();
++      if (await unlock(config, input.value)) {
 +        onSubmit();
 +      } else {
-+        error.textContent = 'Wrong PIN';
++        error.textContent = hasSubtle ? 'Wrong PIN' : 'PIN lock needs https';
 +      }
 +    };
-+    go.onclick = submit;
++    const go = el('button', {className: 'solid', textContent: 'Unlock', onclick: submit});
 +    input.onkeydown = (event) => {
 +      if (event.key === 'Enter') submit();
 +    };
-+    form.append(input, go, cancel, error);
-+    root.append(form);
-+    show();
-+    input.focus();
-+  }
-+
-+  function findLoginForm(node) {
-+    if (!node) return null;
-+    const form = node.closest ? node.closest('form') : null;
-+    if (form) return form;
-+    return node.form || null;
++    show([
++      label(intro, 'Local vault is locked'),
++      input,
++      go,
++      el('button', {textContent: 'Cancel', onclick: hide}),
++      error,
++    ]);
++    setTimeout(() => input.focus(), 0);
 +  }
 +
 +  function passwordFields(scope) {
 +    return Array.from(scope.querySelectorAll('input[type="password"]'))
-+        .filter((input) => !input.disabled && input.type === 'password');
++        .filter((input) => !input.disabled);
 +  }
 +
 +  function usernameField(scope, password) {
-+    const inputs = Array.from(
-+        scope.querySelectorAll('input:not([type]), input[type="text"], input[type="email"], input[type="tel"]'));
++    const inputs = Array.from(scope.querySelectorAll(
++        'input:not([type]), input[type="text"], input[type="email"], input[type="tel"]'));
 +    let best = null;
 +    for (const input of inputs) {
 +      if (input.disabled) continue;
-+      if (input.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING) {
-+        best = input;
-+      }
++      if (input.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING) best = input;
 +    }
-+    const autocomplete = scope.querySelector('input[autocomplete*="username"]');
-+    if (autocomplete && !autocomplete.disabled) return autocomplete;
++    const named = scope.querySelector('input[autocomplete*="username"]');
++    if (named && !named.disabled) return named;
 +    return best;
 +  }
 +
 +  function credentialsFrom(node) {
-+    const form = findLoginForm(node);
++    const form = node && node.closest ? node.closest('form') : null;
 +    const scope = form || document;
 +    const password = passwordFields(scope)[0];
 +    if (!password || !password.value) return null;
 +    const username = usernameField(scope, password);
-+    return {
-+      username: username ? username.value.trim() : '',
-+      password: password.value,
-+    };
++    return {username: username ? username.value.trim() : '', password: password.value};
 +  }
 +
 +  function setValue(input, value) {
@@ -314,447 +403,253 @@ new file mode 100644
 +    input.dispatchEvent(new Event('change', {bubbles: true}));
 +  }
 +
++  async function saveCredential(origin, username, password) {
++    const config = await settings();
++    const key = await restoreKey();
++    if (config.mode === 'pin' && !key) return {error: 'locked'};
++    if (!password) return {error: 'empty'};
++    const list = await items();
++    let replaced = false;
++    for (const item of list) {
++      if (item.origin !== origin) continue;
++      let storedUser = '';
++      try {
++        storedUser = await open(key, item.u);
++      } catch (e) {
++        continue;
++      }
++      if (storedUser === username) {
++        item.u = await seal(key, username);
++        item.p = await seal(key, password);
++        replaced = true;
++        break;
++      }
++    }
++    if (!replaced) {
++      list.push({
++        id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
++        origin,
++        u: await seal(key, username),
++        p: await seal(key, password),
++      });
++    }
++    await storeSet({[ITEMS_KEY]: list});
++    return {ok: true};
++  }
++
 +  async function fillWith(id) {
-+    const reply = await send({type: 'fill', origin: ORIGIN, id});
-+    if (reply && reply.error === 'locked') {
-+      pinPrompt('Enter your PIN to fill', () => fillWith(id));
-+      return;
-+    }
-+    if (!reply || !reply.username && !reply.password) {
-+      hide();
-+      return;
-+    }
++    const key = await restoreKey();
++    const list = (await items()).filter((item) => item.origin === ORIGIN);
++    const item = list.find((candidate) => candidate.id === id) || list[0];
++    if (!item) return;
 +    const password = passwordFields(document)[0];
-+    if (!password) {
++    if (!password) return;
++    const username = usernameField(password.closest('form') || document, password);
++    if (username) setValue(username, await open(key, item.u));
++    setValue(password, await open(key, item.p));
++    hide();
++  }
++
++  async function handleFill(id) {
++    const config = await settings();
++    const key = await restoreKey();
++    if (config.mode === 'pin' && !key) {
++      pinPrompt('Enter your PIN to fill', () => handleFill(id));
++      return;
++    }
++    await fillWith(id);
++  }
++
++  async function handleSave(origin, username, password) {
++    const config = await settings();
++    const key = await restoreKey();
++    if (config.mode === 'pin' && !key) {
++      pinPrompt('Enter your PIN to save', () => handleSave(origin, username, password));
++      return;
++    }
++    const result = await saveCredential(origin, username, password);
++    if (result && result.ok) {
++      await storeSet({[PENDING_KEY]: null});
 +      hide();
-+      return;
 +    }
-+    const username = usernameField(findLoginForm(password) || document, password);
-+    if (username && reply.username) setValue(username, reply.username);
-+    if (reply.password) setValue(password, reply.password);
-+    hide();
 +  }
 +
-+  async function savePending(pending) {
-+    const reply = await send({
-+      type: 'save',
-+      origin: pending.origin,
-+      username: pending.username,
-+      password: pending.password,
-+    });
-+    if (reply && reply.error === 'locked') {
-+      pinPrompt('Enter your PIN to save', () => savePending(pending));
-+      return;
-+    }
-+    hide();
-+  }
-+
-+  function renderSave(pending) {
-+    const where = pending.username ? pending.username : 'this site';
-+    renderBar([
-+      label('Save password?', where),
-+      el('button', {
-+        className: 'solid',
-+        textContent: 'Save',
-+        onclick: () => savePending(pending),
-+      }),
-+      el('button', {
-+        textContent: 'Not now',
-+        onclick: async () => {
-+          await send({type: 'dropPending'});
-+          hide();
-+        },
-+      }),
-+    ]);
-+  }
-+
-+  function renderFill(items) {
-+    const first = items[0];
-+    const where = items.length > 1 ? `${items.length} accounts` : (first.username || 'saved account');
-+    renderBar([
-+      label('Fill password?', where),
-+      el('button', {
-+        className: 'solid',
-+        textContent: 'Fill',
-+        onclick: () => fillWith(first.id),
-+      }),
-+      el('button', {textContent: 'Not now', onclick: () => hide()}),
-+      el('button', {
-+        className: 'icon',
-+        textContent: '\u2699',
-+        onclick: async () => {
-+          const settings = await send({type: 'getSettings'});
-+          renderSettings(settings || {mode: 'none'});
-+        },
-+      }),
-+    ]);
++  function renderSettings(config) {
++    const none = el('input', {type: 'radio', name: 'lv-mode', value: 'none'});
++    none.checked = config.mode !== 'pin';
++    const pin = el('input', {type: 'radio', name: 'lv-mode', value: 'pin'});
++    pin.checked = config.mode === 'pin';
++    const pin1 = el('input', {type: 'password', placeholder: 'PIN', maxLength: 32});
++    const pin2 = el('input', {type: 'password', placeholder: 'Repeat PIN', maxLength: 32});
++    const status = el('div', {className: 'hint'});
++    const save = el('button', {className: 'solid', textContent: 'Save settings'});
++    save.onclick = async () => {
++      const mode = pin.checked ? 'pin' : 'none';
++      const value = pin1.value;
++      if (mode === 'pin' && !hasSubtle) {
++        status.textContent = 'A PIN needs a https page or an extension page.';
++        return;
++      }
++      if (mode === 'pin' && value.length < MIN_PIN) {
++        status.textContent = 'PIN must be at least ' + MIN_PIN + ' characters.';
++        return;
++      }
++      if (mode === 'pin' && value !== pin2.value) {
++        status.textContent = 'PINs do not match.';
++        return;
++      }
++      const current = await settings();
++      const key = current.mode === 'pin' ? await restoreKey() : null;
++      if (current.mode === 'pin' && !key) {
++        status.textContent = 'Unlock first, then change the lock.';
++        return;
++      }
++      const list = await items();
++      if (mode === 'none') {
++        const plain = [];
++        for (const item of list) {
++          plain.push({
++            id: item.id,
++            origin: item.origin,
++            u: await seal(null, await open(key, item.u)),
++            p: await seal(null, await open(key, item.p)),
++          });
++        }
++        await storeSet({[ITEMS_KEY]: plain, [SETTINGS_KEY]: {mode: 'none'}});
++        unlockedKey = null;
++        await sessionSet(KEY_STORAGE, null);
++        hide();
++        return;
++      }
++      const salt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
++      const next = await deriveKey(value, salt);
++      const sealed = [];
++      for (const item of list) {
++        sealed.push({
++          id: item.id,
++          origin: item.origin,
++          u: await seal(next, await open(key, item.u)),
++          p: await seal(next, await open(key, item.p)),
++        });
++      }
++      await storeSet({
++        [ITEMS_KEY]: sealed,
++        [SETTINGS_KEY]: {mode: 'pin', salt, probe: await seal(next, PROBE)},
++      });
++      unlockedKey = next;
++      await sessionSet(KEY_STORAGE, toBase64(await crypto.subtle.exportKey('raw', next)));
++      hide();
++    };
++    build();
++    while (root.firstChild) root.removeChild(root.firstChild);
++    root.append(el('div', {className: 'bar'},
++        label('Local vault', 'Device-only password storage'),
++        el('button', {className: 'icon', textContent: '\u2715', onclick: hide})));
++    const panel = el('div', {className: 'settings'},
++        el('label', {}, none, document.createTextNode('Open without a PIN')),
++        el('label', {}, pin, document.createTextNode('Lock with a PIN')),
++        el('div', {className: 'row'}, pin1, pin2),
++        el('div', {className: 'hint'},
++            document.createTextNode('The PIN is never stored. It derives the AES key.')),
++        el('div', {className: 'row'}, save, status));
++    root.append(panel);
++    host.style.display = 'block';
 +  }
 +
 +  async function onLoad() {
-+    const pending = await send({type: 'takePending', origin: ORIGIN});
-+    if (pending && Date.now() - pending.ts < PENDING_TTL) {
-+      renderSave(pending);
++    const stored = await storeGet(PENDING_KEY);
++    const pending = stored[PENDING_KEY];
++    if (pending && pending.origin === ORIGIN && Date.now() - pending.ts < PENDING_TTL) {
++      await storeSet({[PENDING_KEY]: null});
++      const where = pending.username || 'this site';
++      show([
++        label('Save password?', where),
++        el('button', {
++          className: 'solid',
++          textContent: 'Save',
++          onclick: () => handleSave(pending.origin, pending.username, pending.password),
++        }),
++        el('button', {textContent: 'Not now', onclick: hide}),
++      ]);
 +      return;
 +    }
-+    const list = await send({type: 'list', origin: ORIGIN});
-+    if (list && list.items && list.items.length) {
-+      renderFill(list.items);
++
++    const config = await settings();
++    const key = await restoreKey();
++    const list = (await items()).filter((item) => item.origin === ORIGIN);
++    const gear = el('button', {
++      className: 'icon',
++      textContent: '\u2699',
++      onclick: () => renderSettings(config),
++    });
++
++    if (list.length && !key && config.mode === 'pin') {
++      show([
++        label('Fill password?', list.length > 1 ? list.length + ' accounts' : 'saved login'),
++        el('button', {
++          className: 'solid',
++          textContent: 'Unlock',
++          onclick: () => pinPrompt('Enter your PIN to fill', onLoad),
++        }),
++        el('button', {textContent: 'Not now', onclick: hide}),
++        gear,
++      ]);
++      return;
 +    }
++
++    if (list.length) {
++      const first = list[0];
++      let where = '';
++      try {
++        where = await open(key, first.u);
++      } catch (e) {
++        where = '';
++      }
++      show([
++        label('Fill password?',
++            list.length > 1 ? list.length + ' accounts' : (where || 'saved login')),
++        el('button', {className: 'solid', textContent: 'Fill', onclick: () => handleFill(first.id)}),
++        el('button', {textContent: 'Not now', onclick: hide}),
++        gear,
++      ]);
++      return;
++    }
++
++    // Nothing saved for this origin: stay out of the way unless this looks like a
++    // login page, and then only for a few seconds.
++    if (!passwordFields(document).length) return;
++    show([
++      label('Local vault', config.mode === 'pin' ? 'Locked, nothing saved here' : 'Nothing saved here'),
++      gear,
++      el('button', {textContent: 'Hide', onclick: hide}),
++    ]);
++    setTimeout(() => {
++      if (host && host.style.display !== 'none') hide();
++    }, 12000);
 +  }
 +
-+  document.addEventListener('submit', (event) => {
-+    const creds = credentialsFrom(event.target);
++  function capture(node) {
++    const creds = credentialsFrom(node);
 +    if (!creds) return;
-+    send({
-+      type: 'submit',
++    storeSet({[PENDING_KEY]: {
 +      origin: ORIGIN,
 +      username: creds.username,
 +      password: creds.password,
 +      ts: Date.now(),
-+    });
-+  }, true);
++    }});
++  }
 +
++  document.addEventListener('submit', (event) => capture(event.target), true);
 +  document.addEventListener('keydown', (event) => {
 +    if (event.key !== 'Enter') return;
 +    const target = event.target;
 +    if (!target || target.type !== 'password') return;
-+    const creds = credentialsFrom(target);
-+    if (!creds) return;
-+    send({
-+      type: 'submit',
-+      origin: ORIGIN,
-+      username: creds.username,
-+      password: creds.password,
-+      ts: Date.now(),
-+    });
++    capture(target);
 +  }, true);
 +
 +  if (document.readyState === 'loading') {
-+    document.addEventListener('DOMContentLoaded', () => {
-+      onLoad();
-+    }, {once: true});
++    document.addEventListener('DOMContentLoaded', onLoad, {once: true});
 +  } else {
 +    onLoad();
 +  }
 +})();
-diff --git a/chrome/browser/resources/local_vault/worker.js b/chrome/browser/resources/local_vault/worker.js
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/resources/local_vault/worker.js
-@@ -0,0 +1,316 @@
-+// Copyright 2026 The Chromium Authors
-+// Use of this source code is governed by a BSD-style license that can be
-+// found in the LICENSE file.
-+
-+// Device-only password vault: the storage and crypto half. Records live in
-+// chrome.storage.local, which is app-private and never synced. With a PIN set,
-+// every field is AES-GCM ciphertext under a PBKDF2 key derived from the PIN;
-+// the PIN itself is never written anywhere.
-+
-+'use strict';
-+
-+const SETTINGS_KEY = 'lv_settings';
-+const ITEMS_KEY = 'lv_items';
-+const PENDING_KEY = 'lv_pending';
-+const SESSION_KEY = 'lv_key';
-+const PROBE = 'local-vault-probe-v1';
-+const ITERATIONS = 210000;
-+const MIN_PIN = 4;
-+
-+const encoder = new TextEncoder();
-+const decoder = new TextDecoder();
-+
-+let unlockedKey = null;
-+try {
-+  chrome.storage.session.setAccessLevel({accessLevel: 'TRUSTED_CONTEXTS'});
-+} catch (e) {
-+  // Older engines without session storage still work, they just forget the
-+  // unlocked key whenever the worker is torn down.
-+}
-+
-+function toBase64(bytes) {
-+  let binary = '';
-+  const view = new Uint8Array(bytes);
-+  for (let i = 0; i < view.length; i++) {
-+    binary += String.fromCharCode(view[i]);
-+  }
-+  return btoa(binary);
-+}
-+
-+function fromBase64(text) {
-+  const binary = atob(text);
-+  const bytes = new Uint8Array(binary.length);
-+  for (let i = 0; i < binary.length; i++) {
-+    bytes[i] = binary.charCodeAt(i);
-+  }
-+  return bytes;
-+}
-+
-+async function readSettings() {
-+  const stored = await chrome.storage.local.get(SETTINGS_KEY);
-+  return stored[SETTINGS_KEY] || {mode: 'none'};
-+}
-+
-+async function readItems() {
-+  const stored = await chrome.storage.local.get(ITEMS_KEY);
-+  return stored[ITEMS_KEY] || [];
-+}
-+
-+async function writeItems(items) {
-+  await chrome.storage.local.set({[ITEMS_KEY]: items});
-+}
-+
-+async function readSession() {
-+  if (!chrome.storage.session) return {};
-+  try {
-+    return await chrome.storage.session.get(SESSION_KEY);
-+  } catch (e) {
-+    return {};
-+  }
-+}
-+
-+async function writeSession(value) {
-+  if (!chrome.storage.session) return;
-+  try {
-+    if (value === null) {
-+      await chrome.storage.session.remove(SESSION_KEY);
-+    } else {
-+      await chrome.storage.session.set({[SESSION_KEY]: value});
-+    }
-+  } catch (e) {
-+    // Nothing to do: the key is simply re-derived on the next unlock.
-+  }
-+}
-+
-+async function deriveKey(pin, saltBase64) {
-+  const material = await crypto.subtle.importKey(
-+      'raw', encoder.encode(pin), 'PBKDF2', false, ['deriveKey']);
-+  return crypto.subtle.deriveKey(
-+      {
-+        name: 'PBKDF2',
-+        salt: fromBase64(saltBase64),
-+        iterations: ITERATIONS,
-+        hash: 'SHA-256',
-+      },
-+      material,
-+      {name: 'AES-GCM', length: 256},
-+      true,
-+      ['encrypt', 'decrypt']);
-+}
-+
-+async function seal(key, text) {
-+  if (!key) return {iv: '', ct: toBase64(encoder.encode(text))};
-+  const iv = crypto.getRandomValues(new Uint8Array(12));
-+  const cipher = await crypto.subtle.encrypt(
-+      {name: 'AES-GCM', iv}, key, encoder.encode(text));
-+  return {iv: toBase64(iv), ct: toBase64(cipher)};
-+}
-+
-+async function open(key, blob) {
-+  if (!blob) return '';
-+  if (!blob.iv) return decoder.decode(fromBase64(blob.ct));
-+  const plain = await crypto.subtle.decrypt(
-+      {name: 'AES-GCM', iv: fromBase64(blob.iv)}, key, fromBase64(blob.ct));
-+  return decoder.decode(plain);
-+}
-+
-+async function restoreKey(settings) {
-+  if (settings.mode !== 'pin') {
-+    unlockedKey = null;
-+    return null;
-+  }
-+  if (unlockedKey) return unlockedKey;
-+  const session = await readSession();
-+  const raw = session[SESSION_KEY];
-+  if (!raw) return null;
-+  try {
-+    unlockedKey = await crypto.subtle.importKey(
-+        'raw', fromBase64(raw), {name: 'AES-GCM'}, true, ['encrypt', 'decrypt']);
-+  } catch (e) {
-+    unlockedKey = null;
-+  }
-+  return unlockedKey;
-+}
-+
-+async function unlockWith(settings, pin) {
-+  if (!pin || !settings.salt) return false;
-+  const key = await deriveKey(pin, settings.salt);
-+  try {
-+    const probe = await open(key, settings.probe);
-+    if (probe !== PROBE) return false;
-+  } catch (e) {
-+    return false;
-+  }
-+  unlockedKey = key;
-+  await writeSession(toBase64(await crypto.subtle.exportKey('raw', key)));
-+  return true;
-+}
-+
-+async function itemsFor(origin) {
-+  const items = await readItems();
-+  return items.filter((item) => item.origin === origin);
-+}
-+
-+async function handle(message) {
-+  const settings = await readSettings();
-+  await restoreKey(settings);
-+  const locked = settings.mode === 'pin' && !unlockedKey;
-+
-+  switch (message.type) {
-+    case 'submit': {
-+      const pending = {
-+        origin: message.origin,
-+        username: message.username || '',
-+        password: message.password || '',
-+        ts: message.ts || Date.now(),
-+      };
-+      if (!pending.password) return {ok: false};
-+      if (chrome.storage.session) {
-+        await chrome.storage.session.set({[PENDING_KEY]: pending});
-+      } else {
-+        await chrome.storage.local.set({[PENDING_KEY]: pending});
-+      }
-+      return {ok: true};
-+    }
-+
-+    case 'takePending': {
-+      const store = chrome.storage.session ? chrome.storage.session : chrome.storage.local;
-+      const stored = await store.get(PENDING_KEY);
-+      const pending = stored[PENDING_KEY];
-+      if (!pending) return null;
-+      await store.remove(PENDING_KEY);
-+      if (pending.origin !== message.origin) return null;
-+      return pending;
-+    }
-+
-+    case 'dropPending': {
-+      const store = chrome.storage.session ? chrome.storage.session : chrome.storage.local;
-+      await store.remove(PENDING_KEY);
-+      return {ok: true};
-+    }
-+
-+    case 'list': {
-+      if (locked) return {items: [], locked: true};
-+      const items = await itemsFor(message.origin);
-+      const listed = [];
-+      for (const item of items) {
-+        let username = '';
-+        try {
-+          username = await open(unlockedKey, item.u);
-+        } catch (e) {
-+          username = '';
-+        }
-+        listed.push({id: item.id, username});
-+      }
-+      return {items: listed};
-+    }
-+
-+    case 'fill': {
-+      if (locked) return {error: 'locked'};
-+      const items = await itemsFor(message.origin);
-+      const item = items.find((candidate) => candidate.id === message.id) || items[0];
-+      if (!item) return {error: 'missing'};
-+      try {
-+        return {
-+          username: await open(unlockedKey, item.u),
-+          password: await open(unlockedKey, item.p),
-+        };
-+      } catch (e) {
-+        return {error: 'locked'};
-+      }
-+    }
-+
-+    case 'unlock': {
-+      if (settings.mode !== 'pin') return {ok: true};
-+      const ok = await unlockWith(settings, message.pin);
-+      return ok ? {ok: true} : {error: 'pin'};
-+    }
-+
-+    case 'getSettings':
-+      return {mode: settings.mode, unlocked: !locked};
-+
-+    case 'save': {
-+      if (locked) return {error: 'locked'};
-+      if (!message.origin || !message.password) return {error: 'empty'};
-+      const items = await readItems();
-+      const sealedItem = {
-+        id: crypto.randomUUID(),
-+        origin: message.origin,
-+        u: await seal(unlockedKey, message.username || ''),
-+        p: await seal(unlockedKey, message.password),
-+      };
-+      let replaced = false;
-+      for (let i = 0; i < items.length; i++) {
-+        if (items[i].origin !== message.origin) continue;
-+        let storedUser = '';
-+        try {
-+          storedUser = await open(unlockedKey, items[i].u);
-+        } catch (e) {
-+          continue;
-+        }
-+        if (storedUser === (message.username || '')) {
-+          items[i] = {...sealedItem, id: items[i].id};
-+          replaced = true;
-+          break;
-+        }
-+      }
-+      if (!replaced) items.push(sealedItem);
-+      await writeItems(items);
-+      return {ok: true};
-+    }
-+
-+    case 'setMode': {
-+      const mode = message.mode === 'pin' ? 'pin' : 'none';
-+      const items = await readItems();
-+      const current = settings.mode === 'pin' ? unlockedKey : null;
-+      if (settings.mode === 'pin' && !current) return {error: 'locked'};
-+
-+      if (mode === 'none') {
-+        const plain = [];
-+        for (const item of items) {
-+          plain.push({
-+            id: item.id,
-+            origin: item.origin,
-+            u: await seal(null, await open(current, item.u)),
-+            p: await seal(null, await open(current, item.p)),
-+          });
-+        }
-+        await writeItems(plain);
-+        await chrome.storage.local.set({[SETTINGS_KEY]: {mode: 'none'}});
-+        unlockedKey = null;
-+        await writeSession(null);
-+        return {ok: true};
-+      }
-+
-+      const pin = message.pin || '';
-+      if (pin.length < MIN_PIN) return {error: 'pin-length'};
-+      const salt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
-+      const key = await deriveKey(pin, salt);
-+      const next = [];
-+      for (const item of items) {
-+        next.push({
-+          id: item.id,
-+          origin: item.origin,
-+          u: await seal(key, await open(current, item.u)),
-+          p: await seal(key, await open(current, item.p)),
-+        });
-+      }
-+      await writeItems(next);
-+      await chrome.storage.local.set({
-+        [SETTINGS_KEY]: {mode: 'pin', salt, probe: await seal(key, PROBE)},
-+      });
-+      unlockedKey = key;
-+      await writeSession(toBase64(await crypto.subtle.exportKey('raw', key)));
-+      return {ok: true};
-+    }
-+
-+    default:
-+      return {error: 'unknown'};
-+  }
-+}
-+
-+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-+  if (!message || typeof message.type !== 'string') return false;
-+  handle(message).then(sendResponse, () => sendResponse({error: 'internal'}));
-+  return true;
-+});
