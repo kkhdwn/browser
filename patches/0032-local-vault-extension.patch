@@ -63,7 +63,7 @@ diff --git a/chrome/browser/resources/local_vault/content.js b/chrome/browser/re
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/resources/local_vault/content.js
-@@ -0,0 +1,721 @@
+@@ -0,0 +1,727 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -120,6 +120,7 @@ new file mode 100644
 +  let shadow = null;
 +  let sheet = null;
 +  let activeField = null;
++  let suppressOpen = false;
 +  let currentView = 'accounts';
 +
 +  const encoder = new TextEncoder();
@@ -353,7 +354,7 @@ new file mode 100644
 +  // ------------------------------------------------------------------- field
 +
 +  async function openForField(field) {
-+    if (!field || sheet) return;
++    if (!field || sheet || suppressOpen) return;
 +    activeField = field;
 +    await openAccounts();
 +  }
@@ -369,7 +370,12 @@ new file mode 100644
 +    if (scrim) scrim.remove();
 +    mark('data-lv-sheet', 'closed');
 +    // Closing the sheet must not take the keyboard away from the field the user
-+    // was typing in.
++    // was typing in. Restoring focus fires focusin, so opening is suppressed for
++    // a moment or the sheet would immediately reopen.
++    suppressOpen = true;
++    window.setTimeout(() => {
++      suppressOpen = false;
++    }, 400);
 +    if (activeField && document.contains(activeField)) {
 +      try {
 +        activeField.focus({preventScroll: true});
