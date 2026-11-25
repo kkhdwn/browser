@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Keep the local login database on Android
+
+Upstream deletes the on-device login database during the obsolete-pref
+migration on Android because it assumes the GMS-backed store is in use.
+This build stores passwords in that local database, so stop deleting it
+on startup (it would otherwise wipe saved passwords on every restart).
+---
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -2595,13 +2595,6 @@
+   profile_prefs->ClearPref(kObsoletePasswordsUseUPMLocalAndSeparateStores);
+   profile_prefs->ClearPref(kObsoleteEmptyProfileStoreLoginDatabase);
+   profile_prefs->ClearPref(kObsoleteUpmAutoExportCsvNeedsDeletion);
+-  base::DeleteFile(profile_path.Append(FILE_PATH_LITERAL("Login Data")));
+-  base::DeleteFile(
+-      profile_path.Append(FILE_PATH_LITERAL("Login Data For Account")));
+-  base::DeleteFile(
+-      profile_path.Append(FILE_PATH_LITERAL("Login Data-journal")));
+-  base::DeleteFile(
+-      profile_path.Append(FILE_PATH_LITERAL("Login Data For Account-journal")));
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+   // Added 09/2025.
