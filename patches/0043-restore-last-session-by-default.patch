@@ -7,13 +7,13 @@ expectations for the desktop-android build.
 diff --git a/chrome/browser/prefs/session_startup_pref.cc b/chrome/browser/prefs/session_startup_pref.cc
 --- a/chrome/browser/prefs/session_startup_pref.cc
 +++ b/chrome/browser/prefs/session_startup_pref.cc
-@@ -70,6 +70,9 @@
-   if (features::kSetDefaultToContinueSession.Get()) {
-     return SessionStartupPref::LAST;
-   }
+@@ -65,6 +65,9 @@
+ SessionStartupPref::Type SessionStartupPref::GetDefaultStartupType() {
+ #if BUILDFLAG(IS_CHROMEOS)
+   return SessionStartupPref::LAST;
 +#elif BUILDFLAG(IS_ANDROID)
 +  // Android restores the last session by default.
 +  return SessionStartupPref::LAST;
- #endif
-   return SessionStartupPref::DEFAULT;
- #endif
+ #else
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
+   if (features::kSetDefaultToContinueSession.Get()) {
