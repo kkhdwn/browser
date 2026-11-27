@@ -1,0 +1,19 @@
+Subject: [PATCH] Restore the last session by default on Android
+
+The restore-on-startup preference defaulted to "open the New Tab page" on
+Android. Make it default to restoring the last session, matching Android
+expectations for the desktop-android build.
+---
+diff --git a/chrome/browser/prefs/session_startup_pref.cc b/chrome/browser/prefs/session_startup_pref.cc
+--- a/chrome/browser/prefs/session_startup_pref.cc
++++ b/chrome/browser/prefs/session_startup_pref.cc
+@@ -70,6 +70,9 @@
+   if (features::kSetDefaultToContinueSession.Get()) {
+     return SessionStartupPref::LAST;
+   }
++#elif BUILDFLAG(IS_ANDROID)
++  // Android restores the last session by default.
++  return SessionStartupPref::LAST;
+ #endif
+   return SessionStartupPref::DEFAULT;
+ #endif
