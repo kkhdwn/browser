@@ -1,0 +1,165 @@
+Subject: [PATCH] Move the app-menu icon row to a fixed footer
+
+Render the three-dots menu icon row (back, forward, bookmark, download,
+reload) as a fixed, non-scrolling footer at the bottom of the menu instead
+of the first scrollable list item.
+
+---
+diff --git a/chrome/browser/ui/android/appmenu/internal/java/src/org/chromium/chrome/browser/ui/appmenu/AppMenuCoordinatorFactory.java b/chrome/browser/ui/android/appmenu/internal/java/src/org/chromium/chrome/browser/ui/appmenu/AppMenuCoordinatorFactory.java
+--- a/chrome/browser/ui/android/appmenu/internal/java/src/org/chromium/chrome/browser/ui/appmenu/AppMenuCoordinatorFactory.java
++++ b/chrome/browser/ui/android/appmenu/internal/java/src/org/chromium/chrome/browser/ui/appmenu/AppMenuCoordinatorFactory.java
+@@ -6,6 +6,7 @@
+ 
+ import android.content.Context;
+ import android.graphics.Rect;
++import android.view.LayoutInflater;
+ import android.view.View;
+ 
+ import org.chromium.base.Callback;
+@@ -14,6 +15,8 @@
+ import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
++import org.chromium.chrome.browser.ui.appmenu.internal.R;
+ import org.chromium.ui.base.WindowAndroid;
+ import org.chromium.ui.hierarchicalmenu.HierarchicalMenuController.SubmenuHeaderFactory;
++import org.chromium.ui.modelutil.PropertyModel;
+ 
+ import java.util.function.Supplier;
+ 
+@@ -70,4 +72,15 @@
+     public static void setExceptionReporter(Callback<Throwable> reporter) {
+         AppMenuCoordinatorImpl.setExceptionReporter(reporter);
+     }
++
++    /**
++     * Inflates and binds the app-menu icon row. Used by the tabbed delegate to render the row as
++     * a fixed (non-scrolling) footer, since {@link AppMenuItemViewBinder} is package-private.
++     */
++    public static View createIconRowView(Context context, PropertyModel model) {
++        View view = LayoutInflater.from(context).inflate(R.layout.icon_row_menu_item, null);
++        AppMenuItemViewBinder.bindIconRowItem(
++                model, view, AppMenuItemProperties.ADDITIONAL_ICONS);
++        return view;
++    }
+ }
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/appmenu/AppMenuPropertiesDelegateImpl.java b/chrome/android/java/src/org/chromium/chrome/browser/app/appmenu/AppMenuPropertiesDelegateImpl.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/app/appmenu/AppMenuPropertiesDelegateImpl.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/app/appmenu/AppMenuPropertiesDelegateImpl.java
+@@ -148,6 +148,7 @@
+     private CallbackController mCallbackController = new CallbackController();
+     protected final NullableObservableSupplier<BookmarkModel> mBookmarkModelSupplier;
+     private @Nullable ModelList mModelList;
++    protected @Nullable PropertyModel mIconRowModel;
+     private int mReadAloudPos;
+     protected @Nullable Runnable mReadAloudAppMenuResetter;
+     private boolean mHasReadAloudInserted;
+@@ -877,21 +878,20 @@
+     public void loadingStateChanged(boolean isLoading) {
+         if (mModelList == null) return;
+ 
+-        for (ListItem listItem : mModelList) {
+-            if (listItem.model.get(AppMenuItemProperties.MENU_ITEM_ID) == R.id.icon_row_menu_id) {
+-                ModelList subList = listItem.model.get(AppMenuItemProperties.ADDITIONAL_ICONS);
+-                for (ListItem subListItem : subList) {
+-                    if (subListItem.model.get(AppMenuItemProperties.MENU_ITEM_ID)
+-                            == R.id.reload_menu_id) {
+-                        updateReloadPropertyModel(subListItem.model, isLoading);
+-
+-                        // The additional icons model list is not observed, so replace the full
+-                        // list object to trigger an update.
+-                        ModelList replacementList = new ModelList();
+-                        replacementList.addAll(subList);
+-                        listItem.model.set(AppMenuItemProperties.ADDITIONAL_ICONS, replacementList);
+-                        return;
+-                    }
++        // The icon row now lives in the fixed footer, not the scrollable list.
++        if (mIconRowModel != null) {
++            ModelList subList = mIconRowModel.get(AppMenuItemProperties.ADDITIONAL_ICONS);
++            for (ListItem subListItem : subList) {
++                if (subListItem.model.get(AppMenuItemProperties.MENU_ITEM_ID)
++                        == R.id.reload_menu_id) {
++                    updateReloadPropertyModel(subListItem.model, isLoading);
++
++                    // The additional icons model list is not observed, so replace the full
++                    // list object to trigger an update.
++                    ModelList replacementList = new ModelList();
++                    replacementList.addAll(subList);
++                    mIconRowModel.set(AppMenuItemProperties.ADDITIONAL_ICONS, replacementList);
++                    return;
+                 }
+             }
+         }
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedAppMenuPropertiesDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedAppMenuPropertiesDelegate.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedAppMenuPropertiesDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedAppMenuPropertiesDelegate.java
+@@ -70,6 +70,8 @@
+ import org.chromium.chrome.browser.toolbar.menu_button.MenuItemState;
+ import org.chromium.chrome.browser.toolbar.top.ToolbarUtils;
+ import org.chromium.chrome.browser.ui.appmenu.AppMenuDelegate;
++import org.chromium.chrome.browser.ui.appmenu.AppMenuClickHandler;
++import org.chromium.chrome.browser.ui.appmenu.AppMenuCoordinatorFactory;
+ import org.chromium.chrome.browser.ui.appmenu.AppMenuHandler;
+ import org.chromium.chrome.browser.ui.appmenu.AppMenuItemProperties;
+ import org.chromium.chrome.browser.ui.default_browser_promo.DefaultBrowserPromoUtils;
+@@ -311,27 +313,6 @@
+         final boolean isFileScheme = url.getScheme().equals(UrlConstants.FILE_SCHEME);
+         final boolean isContentScheme = url.getScheme().equals(UrlConstants.CONTENT_SCHEME);
+ 
+-        if (shouldShowIconRow()) {
+-            List<PropertyModel> iconModels = new ArrayList<>();
+-            if (ChromeFeatureList.sThreeDotMenuBackButton.isEnabled()) {
+-                iconModels.add(buildBackwardActionModel(currentTab));
+-            }
+-            iconModels.add(buildForwardActionModel(currentTab));
+-            iconModels.add(buildBookmarkActionModel(currentTab));
+-            iconModels.add(buildDownloadActionModel(currentTab));
+-            if (!ChromeFeatureList.sThreeDotMenuBackButton.isEnabled()) {
+-                iconModels.add(buildPageInfoModel(currentTab));
+-            }
+-
+-            iconModels.add(buildReloadModel(currentTab));
+-
+-            modelList.add(
+-                    new MVCListAdapter.ListItem(
+-                            AppMenuHandler.AppMenuItemType.BUTTON_ROW,
+-                            AppMenuItemUtils.buildModelForIconRow(
+-                                    R.id.icon_row_menu_id, iconModels, isMenuIconAtStart())));
+-        }
+-
+         mUpdateMenuItemVisible = shouldShowUpdateMenuItem();
+         Profile profile = getProfileFromTabModel();
+         if (mUpdateMenuItemVisible) {
+@@ -1489,6 +1470,32 @@
+         return shouldShowIconRow;
+     }
+ 
++    @Override
++    public @Nullable View buildFooterView(AppMenuHandler appMenuHandler) {
++        if (!shouldShowIconRow()) return null;
++
++        Tab currentTab = mActivityTabProvider.get();
++        List<PropertyModel> iconModels = new ArrayList<>();
++        if (ChromeFeatureList.sThreeDotMenuBackButton.isEnabled()) {
++            iconModels.add(buildBackwardActionModel(currentTab));
++        }
++        iconModels.add(buildForwardActionModel(currentTab));
++        iconModels.add(buildBookmarkActionModel(currentTab));
++        iconModels.add(buildDownloadActionModel(currentTab));
++        if (!ChromeFeatureList.sThreeDotMenuBackButton.isEnabled()) {
++            iconModels.add(buildPageInfoModel(currentTab));
++        }
++        iconModels.add(buildReloadModel(currentTab));
++
++        PropertyModel model =
++                AppMenuItemUtils.buildModelForIconRow(
++                        R.id.icon_row_menu_id, iconModels, isMenuIconAtStart());
++        model.set(AppMenuItemProperties.CLICK_HANDLER, (AppMenuClickHandler) appMenuHandler);
++        mIconRowModel = model;
++
++        return AppMenuCoordinatorFactory.createIconRowView(mContext, model);
++    }
++
+     private boolean shouldShowFindInPageItem(@Nullable Tab currentTab) {
+         return currentTab != null
+                 && (shouldShowWebContentsDependentMenuItem(currentTab)
