@@ -1,9 +1,14 @@
-Subject: [PATCH] Start on the last active tab instead of a fresh NTP
+Subject: [PATCH] Resume the last tab instead of the startup NTP home surface
 
-Chromium opens a new New Tab Page as the Start Surface home when Chrome is
-reopened after the return-time threshold (4 hours by default). On this build
-that reads as "a new tab on startup" even though the previous tabs are still
-restored in the background. Keep the last active tab on screen instead.
+Chromium replaces the last active tab with a fresh New Tab Page "home
+surface" when Chrome is launched from the launcher after the return-time
+threshold (4 hours by default), both on cold start and when an existing
+instance is resumed. The previous tabs are restored behind it, so reopening
+the browser after a close or a reboot reads as "a new tab on startup"
+instead of continuing where the user left off.
+
+Keep the last active tab on screen. The NTP itself is still reachable; it
+just stops being the startup surface.
 
 ---
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
@@ -24,10 +29,10 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
 -                getSavedInstanceState(),
 -                getPersistentInstanceState(),
 -                mInactivityTrackerSupplier.get());
-+        // Always resume the last active tab. Chromium replaces it with a fresh
-+        // NTP home surface when Chrome is reopened after the return-time
-+        // threshold (4 hours by default), which reads as "a new tab" instead
-+        // of session restore.
++        // Resume the last active tab. Chromium otherwise swaps it for a fresh
++        // NTP home surface once Chrome has been away for the return-time
++        // threshold (4 hours by default), on cold start and on warm resume,
++        // which reads as "a new tab" instead of continuing the last session.
 +        return false;
      }
  
